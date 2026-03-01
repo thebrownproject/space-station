@@ -105,7 +105,7 @@ const agent = new AgentBuilder('billing-agent')
     ctx.emit('audit.event', { action: 'invoice_created' });
 
     // Reply if this was a request
-    if (msg.headers?.['reply-to']) {
+    if (msg.replyTo) {
       ctx.reply(msg, { success: true });
     }
   })
@@ -141,15 +141,66 @@ await agent.start();
 
 All commands support `--json` for machine-readable output.
 
+## NATS Configuration
+
+AgentBus supports three messaging modes:
+
+### Auto-Start Embedded NATS (default)
+When `nats-server` is installed, AgentBus automatically starts a local NATS server subprocess. This enables cross-process communication out of the box — `agentbus emit` in one terminal reaches `agentbus subscribe` in another.
+
+```bash
+# Install nats-server (macOS)
+brew install nats-server
+
+# Then just use agentbus normally — NATS starts automatically
+agentbus subscribe "billing.>"   # Terminal 1
+agentbus emit billing.invoice.created --payload '{"amount": 99}'  # Terminal 2
+```
+
+### External NATS Server
+Connect to an existing NATS server:
+
+```bash
+# Via CLI flag
+agentbus emit billing.invoice.created --nats nats://my-nats:4222
+
+# Via config
+agentbus config set natsUrl nats://my-nats:4222
+```
+
+### Pure In-Memory (no cross-process)
+For testing or single-process use:
+
+```bash
+agentbus emit billing.invoice.created --no-nats
+```
+
+### Memory Versioning
+
+Memory entries now support optimistic locking via version numbers:
+
+```typescript
+const entry = ctx.memory.set('key', 'value');
+// entry.version === 1
+
+// Update with version check
+ctx.memory.set('key', 'new-value', { expectedVersion: 1 });
+// Succeeds, version is now 2
+
+ctx.memory.set('key', 'conflict', { expectedVersion: 1 });
+// Throws VersionConflictError — version is 2, not 1
+```
+
 ## Tech Stack
 
 | Component | Technology |
 |-----------|-----------|
-| Message Bus | In-memory (NATS-compatible API) → swap to real NATS for production |
+| Message Bus | In-memory + NATS (auto-start or external) |
 | Agent Registry | In-memory → swap to Supabase Postgres |
-| Memory Layer | In-memory → swap to Supabase pgvector |
+| Memory Layer | In-memory with versioning → swap to Supabase pgvector |
 | CLI | Commander.js (TypeScript) |
 | Agent SDK | TypeScript |
+| Testing | Jest + ts-jest |
 
 ## Project Structure
 

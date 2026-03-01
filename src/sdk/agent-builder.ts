@@ -1,6 +1,6 @@
 import type { AgentCard, AgentRegistration } from '../types/agent.js';
 import type { BusMessage } from '../types/message.js';
-import type { MemoryScope } from '../types/memory.js';
+import type { MemoryEntry, MemoryScope } from '../types/memory.js';
 import type { WakeEvent } from '../wake/index.js';
 import { AgentBusPlatform, getPlatform } from '../platform.js';
 
@@ -104,7 +104,8 @@ export class AgentBuilder {
  */
 export class Agent {
   private card?: AgentCard;
-  private platform: AgentBusPlatform;
+  private platform!: AgentBusPlatform;
+  private explicitPlatform?: AgentBusPlatform;
   private registration: AgentRegistration;
   private messageHandlers: Map<string, MessageHandler>;
   private wakeCallback?: WakeCallback;
@@ -119,7 +120,7 @@ export class Agent {
     this.registration = registration;
     this.messageHandlers = messageHandlers;
     this.wakeCallback = wakeCallback;
-    this.platform = platform ?? getPlatform();
+    this.explicitPlatform = platform;
   }
 
   /** Start the agent: register, subscribe to subjects, set up wake handler */
@@ -127,6 +128,9 @@ export class Agent {
     if (this.running) {
       throw new Error(`Agent "${this.registration.name}" is already running`);
     }
+
+    // Resolve the platform (async if using singleton)
+    this.platform = this.explicitPlatform ?? await getPlatform();
 
     // Register with the registry
     this.card = this.platform.registry.register(this.registration);
@@ -272,9 +276,9 @@ export interface AgentContext {
       key: string,
       value: unknown,
       opts?: { scope?: MemoryScope; tags?: string[]; ttl?: number },
-    ): unknown;
-    get(key: string, scope?: MemoryScope): unknown;
-    search(query: string, limit?: number): unknown;
+    ): MemoryEntry;
+    get(key: string, scope?: MemoryScope): MemoryEntry | undefined;
+    search(query: string, limit?: number): MemoryEntry[];
   };
 
   /** Look up another agent */

@@ -11,9 +11,9 @@ import { AgentBusPlatform } from '../src/platform.js';
 import { AgentBuilder } from '../src/sdk/index.js';
 
 async function main() {
-  // Create a fresh platform instance for this demo
-  const platform = new AgentBusPlatform({ embedded: true });
-  platform.start();
+  // Create a fresh platform instance for this demo (embedded: false for in-memory only)
+  const platform = new AgentBusPlatform({ embedded: false });
+  await platform.start();
 
   // --- Agent 1: Billing ---
   const billingAgent = new AgentBuilder('billing')

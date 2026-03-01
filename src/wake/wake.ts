@@ -2,7 +2,7 @@ import { EventEmitter } from 'eventemitter3';
 import type { AgentCard } from '../types/agent.js';
 import type { BusMessage } from '../types/message.js';
 import type { AgentRegistry } from '../registry/registry.js';
-import type { MessageBus } from '../bus/bus.js';
+import type { IMessageBus } from '../bus/types.js';
 
 export interface WakeEvent {
   agentId: string;
@@ -29,7 +29,7 @@ export type WakeHandler = (agent: AgentCard, event: WakeEvent) => void | Promise
  */
 export class WakeManager extends EventEmitter<WakeManagerEvents> {
   private registry: AgentRegistry;
-  private bus: MessageBus;
+  bus: IMessageBus;
   private wakeHandlers: Map<string, WakeHandler> = new Map();
   private wakeLog: WakeEvent[] = [];
   private maxLog: number;
@@ -38,7 +38,7 @@ export class WakeManager extends EventEmitter<WakeManagerEvents> {
 
   constructor(
     registry: AgentRegistry,
-    bus: MessageBus,
+    bus: IMessageBus,
     options: { maxLog?: number } = {},
   ) {
     super();

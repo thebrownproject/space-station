@@ -19,8 +19,8 @@ export function registerMemoryCommands(program: Command): void {
     .option('-t, --tags <tags>', 'Comma-separated tags', '')
     .option('--ttl <seconds>', 'Time-to-live in seconds (0 = never)', '0')
     .option('--json', 'Output as JSON')
-    .action((key, value, opts) => {
-      const platform = getPlatform();
+    .action(async (key, value, opts) => {
+      const platform = await getPlatform();
 
       let parsedValue: unknown;
       try {
@@ -55,8 +55,8 @@ export function registerMemoryCommands(program: Command): void {
     .option('-a, --agent <id>', 'Agent ID')
     .option('--session <id>', 'Session ID')
     .option('--json', 'Output as JSON')
-    .action((key, opts) => {
-      const platform = getPlatform();
+    .action(async (key, opts) => {
+      const platform = await getPlatform();
 
       const entry = platform.memory.get(key, {
         scope: opts.scope,
@@ -89,8 +89,8 @@ export function registerMemoryCommands(program: Command): void {
     .option('-t, --tags <tags>', 'Filter by tags (comma-separated)')
     .option('-n, --limit <n>', 'Max results', '20')
     .option('--json', 'Output as JSON')
-    .action((query, opts) => {
-      const platform = getPlatform();
+    .action(async (query, opts) => {
+      const platform = await getPlatform();
 
       const results = platform.memory.query({
         search: query,
@@ -129,8 +129,8 @@ export function registerMemoryCommands(program: Command): void {
     .option('-s, --scope <scope>', 'Memory scope', 'shared')
     .option('-a, --agent <id>', 'Agent ID')
     .option('--session <id>', 'Session ID')
-    .action((key, opts) => {
-      const platform = getPlatform();
+    .action(async (key, opts) => {
+      const platform = await getPlatform();
 
       const deleted = platform.memory.delete(key, {
         scope: opts.scope,
@@ -152,8 +152,8 @@ export function registerMemoryCommands(program: Command): void {
     .command('stats')
     .description('Show memory statistics')
     .option('--json', 'Output as JSON')
-    .action((opts) => {
-      const platform = getPlatform();
+    .action(async (opts) => {
+      const platform = await getPlatform();
       const stats = platform.memory.stats();
 
       if (opts.json) {

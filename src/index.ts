@@ -3,8 +3,9 @@ export { AgentBusPlatform, getPlatform } from './platform.js';
 
 // Modules
 export { AgentRegistry, subjectMatches, validateSubject, validateAgentName } from './registry/index.js';
-export { MessageBus } from './bus/index.js';
-export { MemoryStore } from './memory/index.js';
+export { MessageBus, NatsMessageBus, startEmbeddedNats } from './bus/index.js';
+export type { IMessageBus, BusEvents, EmbeddedNats } from './bus/index.js';
+export { MemoryStore, VersionConflictError } from './memory/index.js';
 export { WakeManager } from './wake/index.js';
 export type { WakeEvent, WakeHandler } from './wake/index.js';
 

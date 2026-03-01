@@ -2,13 +2,7 @@ import { EventEmitter } from 'eventemitter3';
 import { v4 as uuid } from 'uuid';
 import { subjectMatches, validateSubject } from '../registry/registry.js';
 import type { BusMessage, MessageType, Subscription, MessageFilter } from '../types/message.js';
-
-interface BusEvents {
-  message: (msg: BusMessage) => void;
-  subscribe: (sub: Subscription) => void;
-  unsubscribe: (subId: string) => void;
-  error: (err: Error) => void;
-}
+import type { BusEvents, IMessageBus } from './types.js';
 
 interface PendingRequest {
   resolve: (msg: BusMessage) => void;
@@ -29,7 +23,7 @@ interface PendingRequest {
  * - Queue groups for load-balanced consumption
  * - Message history with JetStream-style replay
  */
-export class MessageBus extends EventEmitter<BusEvents> {
+export class MessageBus extends EventEmitter<BusEvents> implements IMessageBus {
   private subscriptions: Map<string, Subscription & { handler: (msg: BusMessage) => void }> =
     new Map();
   private history: BusMessage[] = [];
@@ -39,6 +33,11 @@ export class MessageBus extends EventEmitter<BusEvents> {
   constructor(options: { maxHistory?: number } = {}) {
     super();
     this.maxHistory = options.maxHistory ?? 10_000;
+  }
+
+  /** No-op for in-memory bus — connection is immediate */
+  async connect(): Promise<void> {
+    // Nothing to do for the in-memory implementation
   }
 
   /**

@@ -1,1 +1,1 @@
-export { MemoryStore } from './memory.js';
+export { MemoryStore, VersionConflictError } from './memory.js';

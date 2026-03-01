@@ -1,6 +1,22 @@
 import { v4 as uuid } from 'uuid';
 import type { MemoryEntry, MemoryQuery, MemoryScope, MemoryStats } from '../types/memory.js';
 
+export class VersionConflictError extends Error {
+  readonly key: string;
+  readonly expectedVersion: number;
+  readonly actualVersion: number;
+
+  constructor(key: string, expectedVersion: number, actualVersion: number) {
+    super(
+      `Version conflict on key "${key}": expected version ${expectedVersion}, but current version is ${actualVersion}`,
+    );
+    this.name = 'VersionConflictError';
+    this.key = key;
+    this.expectedVersion = expectedVersion;
+    this.actualVersion = actualVersion;
+  }
+}
+
 /**
  * Shared memory layer for inter-agent context.
  *
@@ -35,6 +51,7 @@ export class MemoryStore {
       sessionId?: string;
       tags?: string[];
       ttl?: number;
+      expectedVersion?: number;
     } = {},
   ): MemoryEntry {
     const scope = options.scope ?? 'shared';
@@ -42,6 +59,13 @@ export class MemoryStore {
 
     const existing = this.entries.get(compositeKey);
     const now = new Date().toISOString();
+
+    // Optimistic locking: if expectedVersion is provided, check it matches
+    if (options.expectedVersion !== undefined && existing) {
+      if (existing.version !== options.expectedVersion) {
+        throw new VersionConflictError(key, options.expectedVersion, existing.version);
+      }
+    }
 
     const entry: MemoryEntry = {
       id: existing?.id ?? uuid(),
@@ -54,6 +78,7 @@ export class MemoryStore {
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
       ttl: options.ttl ?? existing?.ttl ?? 0,
+      version: (existing?.version ?? 0) + 1,
     };
 
     this.entries.set(compositeKey, entry);
@@ -196,6 +221,10 @@ export class MemoryStore {
           entry.agentId,
           entry.sessionId,
         );
+        // Backward compatibility: ensure version field exists
+        if (entry.version === undefined) {
+          (entry as MemoryEntry).version = 1;
+        }
         this.entries.set(compositeKey, entry);
       }
     }

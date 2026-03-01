@@ -11,8 +11,8 @@ export function registerBusCommands(program: Command): void {
     .option('-p, --payload <json>', 'JSON payload', '{}')
     .option('-f, --from <agent>', 'Sender agent name or ID', 'cli')
     .option('--json', 'Output as JSON')
-    .action((subject, opts) => {
-      const platform = getPlatform();
+    .action(async (subject, opts) => {
+      const platform = await getPlatform();
 
       let payload: unknown;
       try {
@@ -45,7 +45,7 @@ export function registerBusCommands(program: Command): void {
     .option('-f, --from <agent>', 'Sender agent name or ID', 'cli')
     .option('--json', 'Output as JSON')
     .action(async (agent, message, opts) => {
-      const platform = getPlatform();
+      const platform = await getPlatform();
 
       const target = platform.registry.resolve(agent);
       if (!target) {
@@ -85,8 +85,8 @@ export function registerBusCommands(program: Command): void {
     .option('--type <type>', 'Filter by message type (event, request, reply, wake)')
     .option('--since <timestamp>', 'Show messages since timestamp')
     .option('--json', 'Output as JSON')
-    .action((opts) => {
-      const platform = getPlatform();
+    .action(async (opts) => {
+      const platform = await getPlatform();
 
       const messages = platform.bus.queryHistory(
         {
@@ -129,8 +129,8 @@ export function registerBusCommands(program: Command): void {
     .option('-a, --agent <name>', 'Subscribe as this agent', 'cli')
     .option('-q, --queue <group>', 'Queue group for load balancing')
     .option('--json', 'Output as JSON')
-    .action((subject, opts) => {
-      const platform = getPlatform();
+    .action(async (subject, opts) => {
+      const platform = await getPlatform();
 
       console.log(`Subscribing to "${subject}"... (Ctrl+C to stop)`);
 

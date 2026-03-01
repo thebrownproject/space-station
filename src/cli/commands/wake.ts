@@ -11,7 +11,7 @@ export function registerWakeCommands(program: Command): void {
     .option('-r, --reason <reason>', 'Reason for waking', 'Manual wake from CLI')
     .option('--json', 'Output as JSON')
     .action(async (agent, opts) => {
-      const platform = getPlatform();
+      const platform = await getPlatform();
 
       try {
         const event = await platform.wake.wake(agent, opts.reason);
@@ -34,8 +34,8 @@ export function registerWakeCommands(program: Command): void {
     .option('-a, --agent <name>', 'Filter by agent')
     .option('-n, --limit <n>', 'Number of events to show', '20')
     .option('--json', 'Output as JSON')
-    .action((opts) => {
-      const platform = getPlatform();
+    .action(async (opts) => {
+      const platform = await getPlatform();
 
       const agentId = opts.agent
         ? platform.registry.resolve(opts.agent)?.id

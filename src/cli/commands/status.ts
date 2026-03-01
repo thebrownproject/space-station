@@ -7,8 +7,8 @@ export function registerStatusCommand(program: Command): void {
     .command('status')
     .description('Show platform status and statistics')
     .option('--json', 'Output as JSON')
-    .action((opts) => {
-      const platform = getPlatform();
+    .action(async (opts) => {
+      const platform = await getPlatform();
 
       const registryStats = platform.registry.stats();
       const busStats = platform.bus.stats();

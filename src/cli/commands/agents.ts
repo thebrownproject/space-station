@@ -9,8 +9,8 @@ export function registerAgentCommands(program: Command): void {
     .description('List all registered agents')
     .option('-s, --status <status>', 'Filter by status (online, offline, sleeping, busy)')
     .option('--json', 'Output as JSON')
-    .action((opts) => {
-      const platform = getPlatform();
+    .action(async (opts) => {
+      const platform = await getPlatform();
       const agents = platform.registry.list(opts.status);
 
       if (opts.json) {
@@ -47,8 +47,8 @@ export function registerAgentCommands(program: Command): void {
     .option('-e, --endpoint <url>', 'HTTP endpoint for direct communication')
     .option('-v, --version <ver>', 'Agent version', '0.1.0')
     .option('--json', 'Output as JSON')
-    .action((opts) => {
-      const platform = getPlatform();
+    .action(async (opts) => {
+      const platform = await getPlatform();
 
       try {
         const card = platform.registry.register({
@@ -71,6 +71,9 @@ export function registerAgentCommands(program: Command): void {
         } else {
           console.log(`Agent "${card.name}" registered (id: ${card.id})`);
           console.log(formatAgentCard(card));
+          console.log('');
+          console.log('Note: CLI-registered agents cannot respond to "agentbus ask" commands.');
+          console.log('Use the SDK to create agents that handle messages.');
         }
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : err}`);
@@ -83,8 +86,8 @@ export function registerAgentCommands(program: Command): void {
     .command('unregister')
     .description('Remove an agent from the registry')
     .argument('<name-or-id>', 'Agent name or ID')
-    .action((nameOrId) => {
-      const platform = getPlatform();
+    .action(async (nameOrId) => {
+      const platform = await getPlatform();
       const removed = platform.registry.unregister(nameOrId);
 
       if (removed) {
@@ -102,8 +105,8 @@ export function registerAgentCommands(program: Command): void {
     .description('Show detailed info about an agent')
     .argument('<name-or-id>', 'Agent name or ID')
     .option('--json', 'Output as JSON')
-    .action((nameOrId, opts) => {
-      const platform = getPlatform();
+    .action(async (nameOrId, opts) => {
+      const platform = await getPlatform();
       const agent = platform.registry.resolve(nameOrId);
 
       if (!agent) {
@@ -126,8 +129,8 @@ export function registerAgentCommands(program: Command): void {
     .argument('<query>', 'Search query')
     .option('--capability', 'Search by exact capability name')
     .option('--json', 'Output as JSON')
-    .action((query, opts) => {
-      const platform = getPlatform();
+    .action(async (query, opts) => {
+      const platform = await getPlatform();
       const results = opts.capability
         ? platform.registry.findByCapability(query)
         : platform.registry.search(query);

@@ -25,6 +25,8 @@ export interface MemoryEntry {
   updatedAt: string;
   /** TTL in seconds (0 = never expires) */
   ttl: number;
+  /** Monotonically increasing version number for optimistic locking */
+  version: number;
 }
 
 export interface MemoryQuery {

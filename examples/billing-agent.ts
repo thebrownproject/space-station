@@ -15,6 +15,58 @@ const agent = new AgentBuilder('billing-agent')
   .version('1.0.0')
   .capabilities(['invoice', 'refund', 'payment-status'])
   .wakeOn(['billing.>', 'payment.>'])
+
+  // Handle invoice creation
+  .onMessage('billing.invoice.create', async (msg, ctx) => {
+    const { customerId, amount } = msg.payload as { customerId: string; amount: number };
+    console.log(`[billing] Creating invoice for ${customerId}: $${amount}`);
+
+    ctx.memory.set(`invoice:${customerId}`, {
+      amount,
+      status: 'created',
+      createdAt: new Date().toISOString(),
+    }, { tags: ['invoice', customerId] });
+
+    if (msg.replyTo) {
+      ctx.reply(msg, { success: true, invoiceId: `INV-${Date.now()}` });
+    }
+  })
+
+  // Handle invoice status queries
+  .onMessage('billing.invoice.status', async (msg, ctx) => {
+    const { invoiceId } = msg.payload as { invoiceId: string };
+    console.log(`[billing] Looking up invoice: ${invoiceId}`);
+
+    const invoice = ctx.memory.get(invoiceId, 'shared');
+    if (msg.replyTo) {
+      ctx.reply(msg, invoice?.value ?? { error: 'Not found' });
+    }
+  })
+
+  // Handle payment processing
+  .onMessage('payment.process', async (msg, ctx) => {
+    const { invoiceId, method } = msg.payload as { invoiceId: string; method: string };
+    console.log(`[billing] Processing payment for ${invoiceId} via ${method}`);
+
+    if (msg.replyTo) {
+      ctx.reply(msg, { success: true, transactionId: `TXN-${Date.now()}` });
+    }
+  })
+
+  // Handle direct questions from `agentbus ask`
+  .onMessage('_ask.billing-agent', async (msg, ctx) => {
+    const { message } = msg.payload as { message: string };
+    console.log(`[billing] Received question: ${message}`);
+
+    ctx.reply(msg, {
+      response: `Billing agent received your question: "${message}". I handle invoices, refunds, and payment status.`,
+    });
+  })
+
+  .onWake(async (event, _ctx) => {
+    console.log(`[billing] Woke up: ${event.reason}`);
+  })
+
   .build();
 
 // --- Start the agent ---
