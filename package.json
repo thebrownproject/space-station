@@ -1,0 +1,50 @@
+{
+  "name": "@agentbus/core",
+  "version": "0.1.0",
+  "description": "Agent Message Bus — discover, communicate, wake, and remember across heterogeneous AI agents",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "agentbus": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/cli/index.js",
+    "lint": "tsc --noEmit",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "agent",
+    "message-bus",
+    "a2a",
+    "multi-agent",
+    "cli",
+    "orchestration",
+    "ai-agents"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.1.0",
+    "nats": "^2.28.0",
+    "uuid": "^10.0.0",
+    "chalk": "^5.3.0",
+    "conf": "^13.0.1",
+    "ora": "^8.1.0",
+    "cli-table3": "^0.6.5",
+    "eventemitter3": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.6.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.0",
+    "ts-jest": "^29.2.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "type": "module"
+}
