@@ -1,6 +1,6 @@
 import { EventEmitter } from 'eventemitter3';
 import { v4 as uuid } from 'uuid';
-import { subjectMatches } from '../registry/registry.js';
+import { subjectMatches, validateSubject } from '../registry/registry.js';
 import type { BusMessage, MessageType, Subscription, MessageFilter } from '../types/message.js';
 
 interface BusEvents {
@@ -53,9 +53,17 @@ export class MessageBus extends EventEmitter<BusEvents> {
       to?: string;
       type?: MessageType;
       correlationId?: string;
+      replyTo?: string;
       headers?: Record<string, string>;
     } = {},
   ): BusMessage {
+    // Validate subject — internal subjects (starting with _) skip wildcard checks
+    const isInternal = subject.startsWith('_');
+    if (!isInternal) {
+      const err = validateSubject(subject, false);
+      if (err) throw new Error(`Invalid publish subject "${subject}": ${err}`);
+    }
+
     const msg: BusMessage = {
       id: uuid(),
       subject,
@@ -65,6 +73,7 @@ export class MessageBus extends EventEmitter<BusEvents> {
       payload,
       timestamp: new Date().toISOString(),
       correlationId: options.correlationId,
+      replyTo: options.replyTo,
       headers: options.headers,
     };
 
@@ -130,10 +139,8 @@ export class MessageBus extends EventEmitter<BusEvents> {
         to: options.to,
         type: 'request',
         correlationId,
-        headers: {
-          ...options.headers,
-          'reply-to': replySubject,
-        },
+        replyTo: replySubject,
+        headers: options.headers,
       });
     });
   }
@@ -142,9 +149,9 @@ export class MessageBus extends EventEmitter<BusEvents> {
    * Reply to a request message.
    */
   reply(originalMessage: BusMessage, payload: unknown, from?: string): BusMessage {
-    const replySubject = originalMessage.headers?.['reply-to'];
+    const replySubject = originalMessage.replyTo;
     if (!replySubject) {
-      throw new Error('Cannot reply: original message has no reply-to header');
+      throw new Error('Cannot reply: original message has no replyTo subject');
     }
 
     return this.publish(replySubject, payload, {
@@ -165,6 +172,13 @@ export class MessageBus extends EventEmitter<BusEvents> {
     handler: (msg: BusMessage) => void,
     queueGroup?: string,
   ): Subscription {
+    // Validate subject pattern — internal subjects (starting with _) skip validation
+    const isInternal = subject.startsWith('_');
+    if (!isInternal) {
+      const err = validateSubject(subject, true);
+      if (err) throw new Error(`Invalid subscribe pattern "${subject}": ${err}`);
+    }
+
     const sub: Subscription = {
       id: uuid(),
       agentId,
@@ -282,23 +296,26 @@ export class MessageBus extends EventEmitter<BusEvents> {
       }
     }
 
-    // Deliver to all direct subscribers
-    for (const handler of directSubs) {
+    const safeCall = (handler: (msg: BusMessage) => void) => {
       try {
-        handler(msg);
+        // Wrap in Promise.resolve to catch both sync throws and async rejections
+        Promise.resolve(handler(msg)).catch((err: unknown) => {
+          this.emit('error', err instanceof Error ? err : new Error(String(err)));
+        });
       } catch (err) {
         this.emit('error', err instanceof Error ? err : new Error(String(err)));
       }
+    };
+
+    // Deliver to all direct subscribers
+    for (const handler of directSubs) {
+      safeCall(handler);
     }
 
     // For each queue group, pick one random subscriber
     for (const handlers of queueGroups.values()) {
       const idx = Math.floor(Math.random() * handlers.length);
-      try {
-        handlers[idx](msg);
-      } catch (err) {
-        this.emit('error', err instanceof Error ? err : new Error(String(err)));
-      }
+      safeCall(handlers[idx]);
     }
   }
 }

@@ -18,9 +18,19 @@ export class AgentRegistry {
   private agents: Map<string, AgentCard> = new Map();
 
   register(registration: AgentRegistration): AgentCard {
+    // Validate agent name
+    const nameErr = validateAgentName(registration.name);
+    if (nameErr) throw new Error(nameErr);
+
     const existing = this.findByName(registration.name);
     if (existing) {
       throw new Error(`Agent "${registration.name}" is already registered (id: ${existing.id})`);
+    }
+
+    // Validate wake patterns
+    for (const pattern of registration.wakePatterns ?? []) {
+      const patternErr = validateSubject(pattern, true);
+      if (patternErr) throw new Error(`Invalid wake pattern "${pattern}": ${patternErr}`);
     }
 
     const now = new Date().toISOString();
@@ -127,9 +137,36 @@ export class AgentRegistry {
     const agent = this.resolve(idOrName);
     if (!agent) return undefined;
     agent.lastSeenAt = new Date().toISOString();
-    if (agent.status === 'sleeping' || agent.status === 'offline') {
+    if (agent.status === 'offline') {
       agent.status = 'online';
     }
+    return agent;
+  }
+
+  /** Update an existing agent's card (partial update, preserves ID and timestamps) */
+  update(
+    idOrName: string,
+    updates: Partial<Pick<AgentCard, 'description' | 'version' | 'capabilities' | 'wakePatterns' | 'endpoint' | 'auth' | 'metadata'>>,
+  ): AgentCard | undefined {
+    const agent = this.resolve(idOrName);
+    if (!agent) return undefined;
+
+    if (updates.wakePatterns) {
+      for (const pattern of updates.wakePatterns) {
+        const patternErr = validateSubject(pattern, true);
+        if (patternErr) throw new Error(`Invalid wake pattern "${pattern}": ${patternErr}`);
+      }
+    }
+
+    if (updates.description !== undefined) agent.description = updates.description;
+    if (updates.version !== undefined) agent.version = updates.version;
+    if (updates.capabilities !== undefined) agent.capabilities = updates.capabilities;
+    if (updates.wakePatterns !== undefined) agent.wakePatterns = updates.wakePatterns;
+    if (updates.endpoint !== undefined) agent.endpoint = updates.endpoint;
+    if (updates.auth !== undefined) agent.auth = updates.auth;
+    if (updates.metadata !== undefined) agent.metadata = updates.metadata;
+    agent.lastSeenAt = new Date().toISOString();
+
     return agent;
   }
 
@@ -163,9 +200,13 @@ export class AgentRegistry {
     return Array.from(this.agents.values());
   }
 
-  /** Import agent cards (for loading from persistence) */
+  /** Import agent cards (for loading from persistence). Marks all as offline since they may not be running. */
   import(cards: AgentCard[]): void {
     for (const card of cards) {
+      // Skip if an agent with the same name already exists (prevent ghost duplicates)
+      if (this.findByName(card.name) && !this.agents.has(card.id)) continue;
+      // Mark as offline — agent must heartbeat or re-register to go online
+      card.status = 'offline';
       this.agents.set(card.id, card);
     }
   }
@@ -177,8 +218,8 @@ export class AgentRegistry {
 
 /**
  * Match a NATS-style subject against a pattern.
- * - '*' matches a single token
- * - '>' matches one or more tokens at the end
+ * - '*' matches exactly one non-empty token
+ * - '>' matches one or more tokens, must be the last token in the pattern
  * - Exact string matches individual tokens
  *
  * Examples:
@@ -188,8 +229,18 @@ export class AgentRegistry {
  *   subjectMatches("billing.invoice.created", "billing.*.created") => true
  */
 export function subjectMatches(subject: string, pattern: string): boolean {
+  if (!subject || !pattern) return false;
+
   const subjectTokens = subject.split('.');
   const patternTokens = pattern.split('.');
+
+  // Validate: no empty tokens (e.g., "billing..invoice" or ".billing" or "billing.")
+  if (subjectTokens.some((t) => t === '')) return false;
+  if (patternTokens.some((t) => t === '')) return false;
+
+  // Validate: '>' must only appear as the last token
+  const gtIndex = patternTokens.indexOf('>');
+  if (gtIndex !== -1 && gtIndex !== patternTokens.length - 1) return false;
 
   for (let i = 0; i < patternTokens.length; i++) {
     const pt = patternTokens[i];
@@ -209,4 +260,42 @@ export function subjectMatches(subject: string, pattern: string): boolean {
   }
 
   return subjectTokens.length === patternTokens.length;
+}
+
+/**
+ * Validate a NATS-style subject string.
+ * Returns an error message if invalid, or undefined if valid.
+ */
+export function validateSubject(subject: string, allowWildcards = false): string | undefined {
+  if (!subject) return 'Subject cannot be empty';
+  if (subject.startsWith('.') || subject.endsWith('.')) return 'Subject cannot start or end with a dot';
+  if (subject.includes('..')) return 'Subject cannot contain empty tokens (consecutive dots)';
+
+  const tokens = subject.split('.');
+  for (const token of tokens) {
+    if (token === '') return 'Subject contains an empty token';
+    if (!allowWildcards && (token === '*' || token === '>')) {
+      return 'Wildcards (* and >) are not allowed in publish subjects';
+    }
+  }
+
+  if (allowWildcards) {
+    const gtIndex = tokens.indexOf('>');
+    if (gtIndex !== -1 && gtIndex !== tokens.length - 1) {
+      return '">" wildcard must be the last token in the pattern';
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Validate an agent name. Names cannot contain dots (they conflict with
+ * NATS subject tokenisation) and cannot be empty.
+ */
+export function validateAgentName(name: string): string | undefined {
+  if (!name || !name.trim()) return 'Agent name cannot be empty';
+  if (name.includes('.')) return 'Agent name cannot contain dots (conflicts with NATS subject tokens)';
+  if (name.includes(':')) return 'Agent name cannot contain colons (conflicts with memory key separator)';
+  return undefined;
 }

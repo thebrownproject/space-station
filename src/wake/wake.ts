@@ -34,6 +34,7 @@ export class WakeManager extends EventEmitter<WakeManagerEvents> {
   private wakeLog: WakeEvent[] = [];
   private maxLog: number;
   private listening = false;
+  private messageHandler?: (msg: BusMessage) => void;
 
   constructor(
     registry: AgentRegistry,
@@ -54,16 +55,20 @@ export class WakeManager extends EventEmitter<WakeManagerEvents> {
     if (this.listening) return;
     this.listening = true;
 
-    this.bus.on('message', (msg) => {
-      // Don't wake on reply/heartbeat messages
-      if (msg.type === 'reply' || msg.type === 'heartbeat') return;
+    this.messageHandler = (msg: BusMessage) => {
+      // Don't wake on reply/heartbeat/wake messages (wake filtered to prevent cascades)
+      if (msg.type === 'reply' || msg.type === 'heartbeat' || msg.type === 'wake') return;
       this.checkWakePatterns(msg);
-    });
+    };
+    this.bus.on('message', this.messageHandler);
   }
 
   stop(): void {
     this.listening = false;
-    this.bus.removeAllListeners('message');
+    if (this.messageHandler) {
+      this.bus.off('message', this.messageHandler);
+      this.messageHandler = undefined;
+    }
   }
 
   /**
@@ -133,8 +138,8 @@ export class WakeManager extends EventEmitter<WakeManagerEvents> {
     for (const agent of matchingAgents) {
       // Don't wake an agent from its own messages
       if (agent.id === msg.from || agent.name === msg.from) continue;
-      // Don't wake agents that are already busy
-      if (agent.status === 'busy') continue;
+      // Don't wake agents that are already busy or online
+      if (agent.status === 'busy' || agent.status === 'online') continue;
 
       const event: WakeEvent = {
         agentId: agent.id,

@@ -39,7 +39,7 @@ async function main() {
       });
 
       // Reply if this was a request
-      if (msg.headers?.['reply-to']) {
+      if (msg.replyTo) {
         ctx.reply(msg, { success: true, invoiceId: `INV-${Date.now()}` });
       }
     })

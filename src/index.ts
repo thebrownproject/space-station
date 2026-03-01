@@ -2,7 +2,7 @@
 export { AgentBusPlatform, getPlatform } from './platform.js';
 
 // Modules
-export { AgentRegistry, subjectMatches } from './registry/index.js';
+export { AgentRegistry, subjectMatches, validateSubject, validateAgentName } from './registry/index.js';
 export { MessageBus } from './bus/index.js';
 export { MemoryStore } from './memory/index.js';
 export { WakeManager } from './wake/index.js';

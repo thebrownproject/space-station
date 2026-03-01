@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { AgentRegistry } from './registry/index.js';
 import { MessageBus } from './bus/index.js';
@@ -50,13 +50,13 @@ export class AgentBusPlatform {
     this.memory.destroy();
   }
 
-  /** Persist registry and memory state to disk */
+  /** Persist registry and memory state to disk (atomic write-to-temp-then-rename) */
   saveState(): void {
     const registryPath = join(this.config.dataDir, 'registry.json');
     const memoryPath = join(this.config.dataDir, 'memory.json');
 
-    writeFileSync(registryPath, JSON.stringify(this.registry.export(), null, 2), 'utf-8');
-    writeFileSync(memoryPath, JSON.stringify(this.memory.export(), null, 2), 'utf-8');
+    atomicWriteFileSync(registryPath, JSON.stringify(this.registry.export(), null, 2));
+    atomicWriteFileSync(memoryPath, JSON.stringify(this.memory.export(), null, 2));
   }
 
   /** Load persisted state from disk */
@@ -68,8 +68,8 @@ export class AgentBusPlatform {
       try {
         const data = JSON.parse(readFileSync(registryPath, 'utf-8'));
         this.registry.import(data);
-      } catch {
-        // Ignore corrupt state files
+      } catch (err) {
+        console.error(`Warning: could not load registry state: ${err instanceof Error ? err.message : err}`);
       }
     }
 
@@ -77,11 +77,21 @@ export class AgentBusPlatform {
       try {
         const data = JSON.parse(readFileSync(memoryPath, 'utf-8'));
         this.memory.import(data);
-      } catch {
-        // Ignore corrupt state files
+      } catch (err) {
+        console.error(`Warning: could not load memory state: ${err instanceof Error ? err.message : err}`);
       }
     }
   }
+}
+
+/**
+ * Write a file atomically: write to a temp file, then rename.
+ * Rename is atomic on POSIX, preventing partial/corrupt files on crash.
+ */
+function atomicWriteFileSync(filePath: string, data: string): void {
+  const tmpPath = `${filePath}.tmp`;
+  writeFileSync(tmpPath, data, 'utf-8');
+  renameSync(tmpPath, filePath);
 }
 
 /** Singleton platform instance for CLI use */
@@ -91,6 +101,17 @@ export function getPlatform(configOverrides?: Partial<AgentBusConfig>): AgentBus
   if (!_platform) {
     _platform = new AgentBusPlatform(configOverrides);
     _platform.start();
+
+    // Ensure state is saved on process exit
+    const cleanup = () => {
+      if (_platform) {
+        _platform.saveState();
+        _platform.memory.destroy();
+      }
+    };
+    process.on('exit', cleanup);
+    process.on('SIGINT', () => { cleanup(); process.exit(0); });
+    process.on('SIGTERM', () => { cleanup(); process.exit(0); });
   }
   return _platform;
 }

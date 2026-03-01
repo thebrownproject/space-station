@@ -19,6 +19,10 @@ export class MemoryStore {
   constructor(options: { cleanupIntervalMs?: number } = {}) {
     const interval = options.cleanupIntervalMs ?? 60_000;
     this.cleanupInterval = setInterval(() => this.cleanup(), interval);
+    // Don't let the cleanup timer prevent process exit
+    if (this.cleanupInterval.unref) {
+      this.cleanupInterval.unref();
+    }
   }
 
   /** Store a value in memory */
@@ -49,7 +53,7 @@ export class MemoryStore {
       tags: options.tags ?? existing?.tags ?? [],
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
-      ttl: options.ttl ?? 0,
+      ttl: options.ttl ?? existing?.ttl ?? 0,
     };
 
     this.entries.set(compositeKey, entry);
@@ -159,9 +163,11 @@ export class MemoryStore {
   stats(): MemoryStats {
     const byScope: Record<MemoryScope, number> = { agent: 0, shared: 0, session: 0 };
     const byAgent: Record<string, number> = {};
+    let activeCount = 0;
 
     for (const entry of this.entries.values()) {
       if (this.isExpired(entry)) continue;
+      activeCount++;
       byScope[entry.scope]++;
       if (entry.agentId) {
         byAgent[entry.agentId] = (byAgent[entry.agentId] ?? 0) + 1;
@@ -169,7 +175,7 @@ export class MemoryStore {
     }
 
     return {
-      totalEntries: this.entries.size,
+      totalEntries: activeCount,
       byScope,
       byAgent,
     };

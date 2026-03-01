@@ -21,7 +21,7 @@ export interface BusMessage {
   correlationId?: string;
   /** Reply-to subject for request/reply pattern */
   replyTo?: string;
-  /** Message headers */
+  /** Arbitrary message headers */
   headers?: Record<string, string>;
 }
 
