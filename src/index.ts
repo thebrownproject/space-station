@@ -17,6 +17,8 @@ export {
   slugify, parseNode,
 } from './db/index.js';
 export type { Node, NodeRow, CreateNodeInput, UpdateNodeInput, NodeFilter, NodeType, NodeStatus, NodePriority } from './db/index.js';
+export { runAgent, buildPrompt } from './scheduler/index.js';
+export type { CronAction, CronJobConfig, CronJobStatus, DaemonState, JobState, ExecutionLog, SchedulerEvents, RunOptions, RunResult } from './scheduler/index.js';
 export { AgentLoader } from './agents/index.js';
 export type { AgentManifest, AgentFolderConfig, AgentIdentityFiles, AgentSkillRef, CronFileConfig, CronJobFileEntry, AgentLoadResult } from './agents/index.js';
 
