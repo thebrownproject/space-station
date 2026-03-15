@@ -734,6 +734,52 @@ export function registerNodeCommands(program: Command): void {
       }
     });
 
+  // -- urgent (show highest priority open items) --
+  node.command('urgent')
+    .description('Show critical and high priority open tasks')
+    .option('-n, --limit <n>', 'Max results', '20')
+    .option('--json', 'Output as JSON')
+    .action((opts) => {
+      try {
+        ensureDb();
+        const critical = listNodes({ type: 'task', priority: 'critical', limit: parseInt(opts.limit) })
+          .filter(t => t.status !== 'done' && t.status !== 'closed');
+        const high = listNodes({ type: 'task', priority: 'high', limit: parseInt(opts.limit) })
+          .filter(t => t.status !== 'done' && t.status !== 'closed');
+        const urgent = [...critical, ...high];
+
+        if (opts.json) {
+          console.log(formatJson(urgent));
+          return;
+        }
+
+        if (urgent.length === 0) {
+          console.log(chalk.green('No urgent tasks. All clear.'));
+          return;
+        }
+
+        console.log(`${chalk.red('Urgent tasks')} (${urgent.length}):`);
+        const table = new Table({
+          head: ['PRIORITY', 'STATUS', 'TITLE', 'ASSIGNEE', 'PATH'],
+          style: { head: ['dim'] },
+        });
+        for (const t of urgent) {
+          const prioColor = t.priority === 'critical' ? chalk.red : chalk.yellow;
+          table.push([
+            prioColor(t.priority ?? '-'),
+            t.status ?? '-',
+            t.title ?? '(untitled)',
+            t.assignee ? chalk.cyan(t.assignee) : '-',
+            chalk.dim(t.path ?? ''),
+          ]);
+        }
+        console.log(table.toString());
+      } catch (err) {
+        console.error(`Error: ${err instanceof Error ? err.message : err}`);
+        process.exitCode = 1;
+      }
+    });
+
   // -- my (show tasks assigned to me) --
   node.command('my <agent-name>')
     .description('Show open tasks assigned to an agent')

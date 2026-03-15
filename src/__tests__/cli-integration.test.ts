@@ -534,6 +534,23 @@ describe('CLI Integration', () => {
     });
   });
 
+  describe('node urgent', () => {
+    test('shows urgent tasks', async () => {
+      // Create a critical task
+      await cliJson([
+        'node', 'create', '--type', 'task', '--title', 'Urgent Test',
+        '--parent', 'engineering', '--priority', 'critical',
+      ]);
+      const { stdout } = await cli(['node', 'urgent']);
+      expect(stdout).toContain('Urgent Test');
+    });
+
+    test('json output returns array', async () => {
+      const tasks = await cliJson(['node', 'urgent']) as any[];
+      expect(Array.isArray(tasks)).toBe(true);
+    });
+  });
+
   describe('node my', () => {
     test('shows tasks assigned to an agent', async () => {
       await cliJson([
