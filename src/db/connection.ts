@@ -54,3 +54,8 @@ export function closeDb(): void {
   }
   db = null;
 }
+
+/** Inject a pre-configured drizzle instance (for tests with in-memory SQLite). */
+export function _setDbForTesting(instance: ReturnType<typeof drizzle>): void {
+  db = instance;
+}
