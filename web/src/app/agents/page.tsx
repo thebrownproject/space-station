@@ -1,4 +1,5 @@
-import { listNodes } from "@/lib/db";
+import { listNodes, getDb } from "@/lib/db";
+import { sql } from "drizzle-orm";
 import { SpaceSidebar } from "@/components/layout/space-sidebar";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
@@ -53,9 +54,34 @@ function loadAgents(): AgentInfo[] {
   return agents;
 }
 
+function getAgentActivity(): Map<string, { nodeCount: number; lastActive: string | null }> {
+  const result = new Map<string, { nodeCount: number; lastActive: string | null }>();
+  try {
+    const db = getDb();
+    const rows = db.all<{ author: string; count: number; last_update: string }>(
+      sql`SELECT author, COUNT(*) as count, MAX(updated_at) as last_update FROM nodes WHERE author IS NOT NULL GROUP BY author`
+    );
+    for (const row of rows) {
+      result.set(row.author, { nodeCount: row.count, lastActive: row.last_update });
+    }
+  } catch { /* ignore */ }
+  return result;
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
 export default function AgentsPage() {
   const spaces = listNodes({ depth: 0 });
   const agents = loadAgents();
+  const activity = getAgentActivity();
 
   return (
     <div className="flex h-screen bg-stone-50 overflow-hidden">
@@ -104,10 +130,18 @@ export default function AgentsPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3 mt-4">
+                    <div className="grid grid-cols-4 gap-3 mt-4">
                       <MetricCell label="Cron Jobs" value={agent.cronJobs} />
                       <MetricCell label="Skills" value={agent.skills.length} />
-                      <MetricCell label="Capabilities" value={agent.capabilities.length} />
+                      <MetricCell label="Nodes" value={activity.get(agent.name)?.nodeCount ?? 0} />
+                      <div className="bg-stone-50 rounded-md p-2.5 border border-stone-100">
+                        <div className="text-[10px] text-stone-400 uppercase tracking-wider">Last Active</div>
+                        <div className="text-[12px] font-data text-stone-600 mt-0.5">
+                          {activity.get(agent.name)?.lastActive
+                            ? timeAgo(activity.get(agent.name)!.lastActive!)
+                            : "Never"}
+                        </div>
+                      </div>
                     </div>
 
                     {agent.capabilities.length > 0 && (
