@@ -2,7 +2,9 @@
 
 ## Summary
 
-Load agents from filesystem directories. Each agent is a folder containing `agent.yaml` (required), optional identity files (`CLAUDE.md`, `SOUL.md`, `IDENTITY.md`), optional `cron.yaml`, optional `skills/`, and optional `memory/`.
+Load agents from filesystem directories. Each agent is a self-contained folder containing `agent.yaml` (required), identity files (`CLAUDE.md`, `SOUL.md`), optional `cron.yaml`, optional `skills/`, and optional `memory/`. Agents are invoked as Claude Code sessions (`claude -p "..."`) with their folder as the working directory. CLAUDE.md is auto-loaded by Claude Code. The agent reads its own SOUL.md and memory, does work via CLI commands, and writes back to its own memory to evolve over time.
+
+> **Architecture context:** This spec defines the folder structure and loader. See `04-scheduler-daemon.md` for how agents are invoked, `03-cli-nodes.md` for the CLI commands agents use, and `05-skills-system.md` for how skills work.
 
 ## Files to Create
 

@@ -1,8 +1,10 @@
-# Spec 04: Skills System
+# Spec 05: Skills System
 
 ## Summary
 
 A composable skills system where agent capabilities are defined in SKILL.md files (markdown with YAML frontmatter). Skills are "packaged reasoning" — not executable code, but structured instructions that shape how agents approach tasks. The SkillRegistry discovers, loads, and resolves skills from agent-specific and shared directories.
+
+> **Key insight:** The most important skill for every agent is `agentbus-cli` — a SKILL.md that teaches the agent how to use CLI commands (`agentbus node create/list/reply/update/search`). This is how agents interact with the shared node database. See `07-platform-integration.md` for the full example agent with this skill.
 
 ## Files to Create
 
