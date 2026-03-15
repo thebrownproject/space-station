@@ -1,6 +1,33 @@
 import { Command } from 'commander';
+import { join, resolve } from 'node:path';
+import { access } from 'node:fs/promises';
 import { getPlatform } from '../../platform.js';
+import { AgentLoader } from '../../agents/index.js';
+import type { AgentManifest, AgentLoadResult } from '../../agents/index.js';
 import { formatTable, formatAgentCard, formatJson } from '../formatters.js';
+
+/** Map template name to the files it creates (for checkmark output). */
+const TEMPLATE_FILES: Record<string, string[]> = {
+  basic: ['agent.yaml'],
+  full: ['agent.yaml', 'CLAUDE.md', 'SOUL.md', 'IDENTITY.md', 'skills/', 'memory/'],
+  cron: ['agent.yaml', 'CLAUDE.md', 'cron.yaml'],
+};
+
+/** Build an AgentLoadResult from a manifest (no platform registration yet). */
+function manifestToLoadResult(manifest: AgentManifest): AgentLoadResult {
+  const warnings: string[] = [];
+  if (manifest.identityFiles.soul !== undefined && manifest.identityFiles.soul.trim() === '') {
+    warnings.push(`${manifest.config.name}: SOUL.md is empty`);
+  }
+  return {
+    manifest,
+    agentId: '',
+    agentName: manifest.config.name,
+    cronJobsLoaded: manifest.cronConfig?.jobs.length ?? 0,
+    skillsLoaded: manifest.skills.length,
+    warnings,
+  };
+}
 
 export function registerAgentCommands(program: Command): void {
   // agentbus ls
@@ -153,5 +180,89 @@ export function registerAgentCommands(program: Command): void {
       ]);
 
       console.log(formatTable(['Name', 'Status', 'Capabilities', 'ID'], rows));
+    });
+
+  // spacestation init <name>
+  program
+    .command('init')
+    .description('Create a new agent folder')
+    .argument('<name>', 'Agent name')
+    .option('-d, --dir <path>', 'Parent directory', './agents')
+    .option('-t, --template <type>', 'Template: basic | full | cron', 'basic')
+    .action(async (name: string, opts) => {
+      try {
+        const loader = new AgentLoader();
+        const folderPath = await loader.initAgent(opts.dir, name, opts.template);
+        const files = TEMPLATE_FILES[opts.template] ?? TEMPLATE_FILES.basic;
+        const relative = folderPath.replace(resolve('.') + '/', '');
+        console.log(`Created agent folder: ${relative}/`);
+        for (const file of files) {
+          console.log(`  ${file.padEnd(14)}\u2713`);
+        }
+      } catch (err) {
+        console.error(`Error: ${err instanceof Error ? err.message : err}`);
+        process.exitCode = 1;
+      }
+    });
+
+  // spacestation load <path>
+  program
+    .command('load')
+    .description('Load agent(s) from folder(s)')
+    .argument('<path>', 'Agent folder or directory of agent folders')
+    .option('--json', 'Output as JSON')
+    .action(async (targetPath: string, opts) => {
+      try {
+        const loader = new AgentLoader();
+        const resolved = resolve(targetPath);
+        let manifests: AgentManifest[];
+
+        // Single agent folder (has agent.yaml) vs directory of agents
+        const agentYaml = join(resolved, 'agent.yaml');
+        let isSingleAgent = false;
+        try {
+          await access(agentYaml);
+          isSingleAgent = true;
+        } catch {
+          // not a single agent folder
+        }
+
+        if (isSingleAgent) {
+          manifests = [await loader.loadManifest(resolved)];
+        } else {
+          manifests = await loader.discoverAgents(resolved);
+        }
+
+        if (manifests.length === 0) {
+          console.log('No agent folders found.');
+          return;
+        }
+
+        const results = manifests.map(manifestToLoadResult);
+        const warnings = results.flatMap((r) => r.warnings);
+
+        if (opts.json) {
+          console.log(formatJson(results));
+          return;
+        }
+
+        console.log(`Loaded ${manifests.length} agent${manifests.length === 1 ? '' : 's'}:`);
+        for (const r of results) {
+          const cronLabel = r.cronJobsLoaded === 1 ? '1 cron job' : `${r.cronJobsLoaded} cron jobs`;
+          const skillLabel = r.skillsLoaded === 1 ? '1 skill' : `${r.skillsLoaded} skills`;
+          console.log(`  ${r.agentName.padEnd(16)} ${cronLabel}, ${skillLabel}`);
+        }
+
+        if (warnings.length > 0) {
+          console.log('');
+          console.log('Warnings:');
+          for (const w of warnings) {
+            console.log(`  ${w}`);
+          }
+        }
+      } catch (err) {
+        console.error(`Error: ${err instanceof Error ? err.message : err}`);
+        process.exitCode = 1;
+      }
     });
 }
