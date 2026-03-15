@@ -75,12 +75,10 @@ export interface ExecutionLog {
 }
 
 /**
- * Events emitted by CronManager (used by future scheduler.ts).
+ * Events emitted by CronManager.
  */
 export interface SchedulerEvents {
-  'job:start': (agentName: string, jobId: string) => void;
-  'job:complete': (agentName: string, jobId: string, durationMs: number) => void;
-  'job:error': (agentName: string, jobId: string, error: Error) => void;
-  'job:timeout': (agentName: string, jobId: string) => void;
-  'job:skip': (agentName: string, jobId: string, reason: string) => void;
+  'job:start': (log: ExecutionLog) => void;
+  'job:complete': (log: ExecutionLog) => void;
+  'job:error': (log: ExecutionLog) => void;
 }

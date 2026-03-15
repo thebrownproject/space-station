@@ -58,6 +58,7 @@ export interface CronJobFileEntry {
   catchUp?: boolean;
   timezone?: string;
   protect?: boolean;
+  timeout?: number;
 }
 
 /** Result of loading an agent folder into the platform. */
