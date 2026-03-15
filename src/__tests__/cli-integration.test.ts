@@ -752,6 +752,28 @@ describe('CLI Integration', () => {
     });
   });
 
+  describe('node batch', () => {
+    test('processes multiple operations', async () => {
+      const { execFile: execFileCb } = await import('node:child_process');
+      const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+        const child = execFileCb(
+          'node', [join(process.cwd(), 'dist', 'cli', 'index.js'), 'node', 'batch'],
+          { env: { ...process.env, AGENTBUS_DB: dbPath }, timeout: 10000 },
+          (err, stdout, stderr) => {
+            if (err) reject(err);
+            else resolve({ stdout, stderr });
+          },
+        );
+        child.stdin!.write(JSON.stringify([
+          { action: 'create', type: 'task', title: 'Batch 1', parentPath: 'engineering' },
+          { action: 'create', type: 'task', title: 'Batch 2', parentPath: 'engineering' },
+        ]));
+        child.stdin!.end();
+      });
+      expect(stdout).toContain('2 ok');
+    });
+  });
+
   describe('verify', () => {
     test('shows system health', async () => {
       const { stdout } = await cli(['verify']);
