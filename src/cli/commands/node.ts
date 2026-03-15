@@ -1,10 +1,12 @@
 import { Command } from 'commander';
 import {
   createNode, getNode, getNodeByPath, updateNode, deleteNode,
-  getChildren, getAncestors, runMigrations,
-  type CreateNodeInput, type UpdateNodeInput, type Node,
+  getChildren, getAncestors, runMigrations, listNodes, getSubtree,
+  type CreateNodeInput, type UpdateNodeInput, type NodeFilter, type Node,
 } from '../../db/index.js';
 import { formatJson } from '../formatters.js';
+import chalk from 'chalk';
+import Table from 'cli-table3';
 
 let migrated = false;
 function ensureDb(): void {
@@ -221,7 +223,7 @@ export function registerNodeCommands(program: Command): void {
           return;
         }
 
-        const deleted = deleteNode(found.id);
+        deleteNode(found.id);
         if (opts.json) {
           console.log(formatJson({ deleted: true, id: found.id, path: found.path }));
         } else {
@@ -266,4 +268,279 @@ export function registerNodeCommands(program: Command): void {
         process.exitCode = 1;
       }
     });
+
+  // -- list --
+  node.command('list [path-or-id]')
+    .description('List nodes (default: root spaces)')
+    .option('--type <type>', 'Filter by type')
+    .option('--status <status>', 'Filter by status')
+    .option('--author <name>', 'Filter by author')
+    .option('--assignee <name>', 'Filter by assignee')
+    .option('--tags <tags>', 'Filter by tags (comma-separated, match any)')
+    .option('--priority <level>', 'Filter by priority')
+    .option('--search <query>', 'Text search')
+    .option('-n, --limit <n>', 'Max results', '50')
+    .option('--offset <n>', 'Skip results', '0')
+    .option('--sort <field>', 'Sort by: created|updated|title')
+    .option('--asc', 'Sort ascending')
+    .option('--json', 'Output as JSON')
+    .action(async (pathOrId: string | undefined, opts) => {
+      try {
+        ensureDb();
+        const filter: NodeFilter = {
+          limit: parseInt(opts.limit),
+          offset: parseInt(opts.offset),
+          orderBy: opts.sort,
+          orderDir: opts.asc ? 'asc' : 'desc',
+        };
+        if (opts.type) filter.type = opts.type;
+        if (opts.status) filter.status = opts.status;
+        if (opts.author) filter.author = opts.author;
+        if (opts.assignee) filter.assignee = opts.assignee;
+        if (opts.priority) filter.priority = opts.priority;
+        if (opts.search) filter.search = opts.search;
+        if (opts.tags) filter.tags = parseTags(opts.tags);
+
+        if (pathOrId) {
+          const parent = resolveNode(pathOrId);
+          filter.parentId = parent.id;
+        }
+
+        const results = listNodes(filter);
+
+        if (opts.json) {
+          console.log(formatJson(results));
+          return;
+        }
+
+        if (results.length === 0) {
+          console.log('No nodes found.');
+          return;
+        }
+
+        const header = pathOrId
+          ? `${pathOrId} (${results.length} children):`
+          : `Spaces:`;
+        console.log(header);
+
+        const table = new Table({
+          head: ['TYPE', 'PRIORITY', 'STATUS', 'TITLE', 'AUTHOR', 'UPDATED'],
+          style: { head: ['dim'] },
+        });
+        for (const n of results) {
+          table.push([
+            n.type,
+            n.priority ?? '-',
+            n.status ?? '-',
+            n.title ?? n.slug ?? n.id.slice(0, 8),
+            n.author ?? '-',
+            timeAgo(n.updatedAt),
+          ]);
+        }
+        console.log(table.toString());
+      } catch (err) {
+        console.error(`Error: ${err instanceof Error ? err.message : err}`);
+        process.exitCode = 1;
+      }
+    });
+
+  // -- search --
+  node.command('search <query>')
+    .description('Search nodes')
+    .option('--type <type>', 'Filter by type')
+    .option('--status <status>', 'Filter by status')
+    .option('-n, --limit <n>', 'Max results', '20')
+    .option('--json', 'Output as JSON')
+    .action(async (query: string, opts) => {
+      try {
+        ensureDb();
+        // Use listNodes directly so we can pass type/status filters
+        const filter: NodeFilter = {
+          search: query,
+          limit: parseInt(opts.limit),
+        };
+        if (opts.type) filter.type = opts.type;
+        if (opts.status) filter.status = opts.status;
+
+        const results = listNodes(filter);
+
+        if (opts.json) {
+          console.log(formatJson(results));
+          return;
+        }
+
+        console.log(`Search: "${query}" (${results.length} results)`);
+        if (results.length === 0) return;
+
+        const table = new Table({
+          head: ['PATH', 'TYPE', 'TITLE', 'AUTHOR'],
+          style: { head: ['dim'] },
+        });
+        for (const n of results) {
+          table.push([
+            n.path ?? n.id.slice(0, 8),
+            n.type,
+            n.title ?? '(untitled)',
+            n.author ?? '-',
+          ]);
+        }
+        console.log(table.toString());
+      } catch (err) {
+        console.error(`Error: ${err instanceof Error ? err.message : err}`);
+        process.exitCode = 1;
+      }
+    });
+
+  // -- tree --
+  node.command('tree [path-or-id]')
+    .description('Display node tree')
+    .option('--depth <n>', 'Max depth', '3')
+    .option('--type <type>', 'Filter by type')
+    .option('--json', 'Output as JSON')
+    .action(async (pathOrId: string | undefined, opts) => {
+      try {
+        ensureDb();
+        const maxDepth = parseInt(opts.depth);
+        let flat: Node[];
+
+        if (pathOrId) {
+          const root = resolveNode(pathOrId);
+          flat = getSubtree(root.id, maxDepth);
+        } else {
+          // Show all root nodes and their subtrees
+          const roots = listNodes({ limit: 100 });
+          flat = [];
+          for (const root of roots) {
+            flat.push(...getSubtree(root.id, maxDepth));
+          }
+        }
+
+        if (opts.type) {
+          const keepType = opts.type as string;
+          flat = flat.filter(n => n.type === keepType);
+        }
+
+        if (flat.length === 0) {
+          console.log('No nodes found.');
+          return;
+        }
+
+        if (opts.json) {
+          console.log(formatJson(buildNestedJson(flat)));
+          return;
+        }
+
+        renderTree(flat);
+      } catch (err) {
+        console.error(`Error: ${err instanceof Error ? err.message : err}`);
+        process.exitCode = 1;
+      }
+    });
+}
+
+// -- Tree rendering helpers --
+
+const TYPE_COLORS: Record<string, (s: string) => string> = {
+  space: (s) => chalk.bold.white(s),
+  task: (s) => chalk.yellow(s),
+  page: (s) => chalk.cyan(s),
+  comment: (s) => chalk.dim(s),
+  report: (s) => chalk.magenta(s),
+  post: (s) => chalk.white(s),
+};
+
+function colorNode(node: Node, label: string): string {
+  if (node.priority === 'critical') return chalk.red(label);
+  if (node.status === 'done') return chalk.green(label);
+  const colorFn = TYPE_COLORS[node.type] ?? ((s: string) => s);
+  return colorFn(label);
+}
+
+function nodeLabel(node: Node): string {
+  if (node.type === 'space') return node.title ?? node.slug ?? node.id.slice(0, 8);
+
+  const parts: string[] = [node.type];
+  if (node.priority) parts.push(node.priority);
+  if (node.status) parts.push(node.status);
+  const badge = `[${parts.join('/')}]`;
+
+  let label: string;
+  if (node.type === 'comment') {
+    const snippet = (node.content ?? '').slice(0, 40);
+    const suffix = (node.content ?? '').length > 40 ? '...' : '';
+    label = `${badge} "${snippet}${suffix}"`;
+    if (node.author) label += ` -- ${node.author}`;
+  } else {
+    label = `${badge} ${node.title ?? node.slug ?? node.id.slice(0, 8)}`;
+    if (node.assignee) label += ` <- ${node.assignee}`;
+  }
+  return label;
+}
+
+function renderTree(flat: Node[]): void {
+  // Build parent->children map
+  const childrenMap = new Map<string | null, Node[]>();
+  for (const n of flat) {
+    const pid = n.parentId ?? null;
+    let list = childrenMap.get(pid);
+    if (!list) {
+      list = [];
+      childrenMap.set(pid, list);
+    }
+    list.push(n);
+  }
+
+  // Find roots (nodes whose parent is not in the flat set)
+  const idSet = new Set(flat.map(n => n.id));
+  const roots = flat.filter(n => !n.parentId || !idSet.has(n.parentId));
+
+  function printNode(node: Node, prefix: string, isLast: boolean, isRoot: boolean): void {
+    const connector = isRoot ? '' : (isLast ? '└── ' : '├── ');
+    const label = nodeLabel(node);
+    console.log(prefix + connector + colorNode(node, label));
+
+    const children = childrenMap.get(node.id) ?? [];
+    const nextPrefix = isRoot ? prefix : prefix + (isLast ? '    ' : '│   ');
+    children.forEach((child, i) => {
+      printNode(child, nextPrefix, i === children.length - 1, false);
+    });
+  }
+
+  roots.forEach((root, i) => {
+    printNode(root, '', i === roots.length - 1, true);
+  });
+}
+
+function buildNestedJson(flat: Node[]): unknown[] {
+  const childrenMap = new Map<string | null, Node[]>();
+  for (const n of flat) {
+    const pid = n.parentId ?? null;
+    let list = childrenMap.get(pid);
+    if (!list) {
+      list = [];
+      childrenMap.set(pid, list);
+    }
+    list.push(n);
+  }
+
+  const idSet = new Set(flat.map(n => n.id));
+  const roots = flat.filter(n => !n.parentId || !idSet.has(n.parentId));
+
+  function nest(node: Node): Record<string, unknown> {
+    const children = (childrenMap.get(node.id) ?? []).map(nest);
+    return { ...node, children };
+  }
+
+  return roots.map(nest);
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
