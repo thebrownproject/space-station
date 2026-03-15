@@ -7,8 +7,8 @@ const program = new Command();
 
 program
   .name('spacestation')
-  .description('Agent Message Bus — discover, communicate, wake, and remember across AI agents')
-  .version('0.1.0');
+  .description('Multi-agent workspace — agents coordinate through a shared database, scheduled via cron, invoked as Claude Code sessions')
+  .version('0.3.0');
 
 registerCommands(program);
 

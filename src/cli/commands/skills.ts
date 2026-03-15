@@ -37,6 +37,14 @@ async function loadRegistry(): Promise<SkillRegistry> {
   return registry;
 }
 
+import type { Skill } from '../../skills/skill-types.js';
+
+function skillRow(s: Skill): string[] {
+  return [s.name, s.description, s.version, s.source, s.agentName ?? '-', (s.tags ?? []).join(', ') || '-'];
+}
+
+const SKILL_HEADERS = ['Name', 'Description', 'Version', 'Source', 'Agent', 'Tags'];
+
 export function registerSkillsCommands(program: Command): void {
   const skills = program.command('skills').description('Skills management');
 
@@ -65,15 +73,7 @@ export function registerSkillsCommands(program: Command): void {
           return;
         }
 
-        const rows = results.map((s) => [
-          s.name,
-          s.description,
-          s.version,
-          s.source,
-          s.agentName ?? '-',
-          (s.tags ?? []).join(', ') || '-',
-        ]);
-        console.log(formatTable(['Name', 'Description', 'Version', 'Source', 'Agent', 'Tags'], rows));
+        console.log(formatTable(SKILL_HEADERS, results.map(skillRow)));
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : err}`);
         process.exitCode = 1;
@@ -147,15 +147,7 @@ export function registerSkillsCommands(program: Command): void {
           return;
         }
 
-        const rows = results.map((s) => [
-          s.name,
-          s.description,
-          s.version,
-          s.source,
-          s.agentName ?? '-',
-          (s.tags ?? []).join(', ') || '-',
-        ]);
-        console.log(formatTable(['Name', 'Description', 'Version', 'Source', 'Agent', 'Tags'], rows));
+        console.log(formatTable(SKILL_HEADERS, results.map(skillRow)));
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : err}`);
         process.exitCode = 1;

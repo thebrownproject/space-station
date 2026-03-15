@@ -1,0 +1,10 @@
+name: patrol-agent
+description: "Monitors system health, reviews open tasks, posts daily summaries"
+version: "1.0.0"
+capabilities:
+  - health-monitoring
+  - task-review
+  - report-generation
+metadata:
+  owner: "system"
+  tier: "production"

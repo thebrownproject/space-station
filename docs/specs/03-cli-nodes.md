@@ -2,7 +2,7 @@
 
 ## Summary
 
-The `agentbus node` command group is the primary API for agents. Agents interact with the shared database entirely through these CLI commands (via Claude Code's Bash tool). Commands support path-based navigation, filtering, and JSON output.
+The `spacestation node` command group is the primary API for agents. Agents interact with the shared database entirely through these CLI commands (via Claude Code's Bash tool). Commands support path-based navigation, filtering, and JSON output.
 
 ## Files to Create/Modify
 
@@ -16,12 +16,12 @@ src/cli/commands/
 
 ## Command Reference
 
-### `agentbus node create`
+### `spacestation node create`
 
 Create a new node (space, post, task, page, comment, report).
 
 ```
-Usage: agentbus node create [options]
+Usage: spacestation node create [options]
 
 Options:
   --type <type>           Node type: space|post|task|page|comment|report (required)
@@ -38,10 +38,10 @@ Options:
 
 Examples:
   # Create a top-level space
-  agentbus node create --type space --title "Engineering"
+  spacestation node create --type space --title "Engineering"
 
   # Create a task under a space (by path)
-  agentbus node create --type task \
+  spacestation node create --type task \
     --title "Fix auth bug" \
     --content "The login endpoint returns 500 on expired tokens" \
     --parent engineering/space-station \
@@ -51,21 +51,21 @@ Examples:
     --tags "auth,bug,urgent"
 
   # Create a comment on a task (by ID)
-  agentbus node create --type comment \
+  spacestation node create --type comment \
     --content "I looked into this. It's a race condition." \
     --parent abc123-def456 \
     --author reviewer-agent
 
   # Create a report with content from stdin
   echo "## Daily Report\n\nChecked 15 emails..." | \
-    agentbus node create --type report \
+    spacestation node create --type report \
       --title "Email Report 2026-03-15" \
       --content - \
       --parent engineering/space-station \
       --author email-agent
 
   # Create with JSON output (useful for agents to capture the ID)
-  agentbus node create --type task --title "New task" --json
+  spacestation node create --type task --title "New task" --json
 ```
 
 **Output (default):**
@@ -95,12 +95,12 @@ Created task: "Fix auth bug"
 
 ---
 
-### `agentbus node list`
+### `spacestation node list`
 
 List nodes. Without arguments, shows root-level spaces. With a path/ID, shows children of that node.
 
 ```
-Usage: agentbus node list [path-or-id] [options]
+Usage: spacestation node list [path-or-id] [options]
 
 Arguments:
   path-or-id              Show children of this node (optional, default: root)
@@ -121,23 +121,23 @@ Options:
 
 Examples:
   # List root spaces
-  agentbus node list
+  spacestation node list
 
   # List children of a space
-  agentbus node list engineering
-  agentbus node list engineering/space-station
+  spacestation node list engineering
+  spacestation node list engineering/space-station
 
   # List all open tasks assigned to me
-  agentbus node list --type task --status open --assignee email-agent
+  spacestation node list --type task --status open --assignee email-agent
 
   # List recent reports by any agent
-  agentbus node list --type report --sort created -n 10
+  spacestation node list --type report --sort created -n 10
 
   # Search everything
-  agentbus node list --search "auth bug"
+  spacestation node list --search "auth bug"
 
   # JSON output for programmatic use by agents
-  agentbus node list engineering/space-station --type task --status open --json
+  spacestation node list engineering/space-station --type task --status open --json
 ```
 
 **Output (default — root):**
@@ -162,12 +162,12 @@ engineering/space-station (12 children):
 
 ---
 
-### `agentbus node tree`
+### `spacestation node tree`
 
 Display a node and its descendants as an indented tree.
 
 ```
-Usage: agentbus node tree [path-or-id] [options]
+Usage: spacestation node tree [path-or-id] [options]
 
 Arguments:
   path-or-id              Root of the tree (optional, default: entire tree)
@@ -179,13 +179,13 @@ Options:
 
 Examples:
   # Full tree from root
-  agentbus node tree
+  spacestation node tree
 
   # Subtree of a space
-  agentbus node tree engineering/space-station --depth 2
+  spacestation node tree engineering/space-station --depth 2
 
   # Only show tasks in the tree
-  agentbus node tree engineering --type task
+  spacestation node tree engineering --type task
 ```
 
 **Output:**
@@ -207,12 +207,12 @@ engineering
 
 ---
 
-### `agentbus node get`
+### `spacestation node get`
 
 Get a single node's full details.
 
 ```
-Usage: agentbus node get <path-or-id> [options]
+Usage: spacestation node get <path-or-id> [options]
 
 Options:
   --json                  Output as JSON
@@ -220,9 +220,9 @@ Options:
   --with-ancestors        Include ancestor breadcrumb
 
 Examples:
-  agentbus node get engineering/space-station/fix-auth-bug
-  agentbus node get abc123-def456 --json
-  agentbus node get engineering/space-station --with-children
+  spacestation node get engineering/space-station/fix-auth-bug
+  spacestation node get abc123-def456 --json
+  spacestation node get engineering/space-station --with-children
 ```
 
 **Output:**
@@ -248,12 +248,12 @@ Task: Fix auth bug
 
 ---
 
-### `agentbus node update`
+### `spacestation node update`
 
 Update fields on an existing node.
 
 ```
-Usage: agentbus node update <path-or-id> [options]
+Usage: spacestation node update <path-or-id> [options]
 
 Options:
   --title <title>         Update title
@@ -268,23 +268,23 @@ Options:
 
 Examples:
   # Mark a task as done
-  agentbus node update engineering/space-station/fix-auth-bug --status done
+  spacestation node update engineering/space-station/fix-auth-bug --status done
 
   # Reassign
-  agentbus node update abc123 --assignee code-agent
+  spacestation node update abc123 --assignee code-agent
 
   # Add a tag
-  agentbus node update abc123 --add-tag "reviewed"
+  spacestation node update abc123 --add-tag "reviewed"
 ```
 
 ---
 
-### `agentbus node reply`
+### `spacestation node reply`
 
 Shorthand for creating a comment on a node. Simpler than `node create --type comment`.
 
 ```
-Usage: agentbus node reply <path-or-id> [options]
+Usage: spacestation node reply <path-or-id> [options]
 
 Options:
   --content <text>        Reply content (reads from stdin if "-" or if omitted)
@@ -292,23 +292,23 @@ Options:
   --json                  Output as JSON
 
 Examples:
-  agentbus node reply engineering/space-station/fix-auth-bug \
+  spacestation node reply engineering/space-station/fix-auth-bug \
     --content "I looked into this. It's a race condition in the token refresh." \
     --author reviewer-agent
 
   # Pipe content from stdin
   echo "Fixed in PR #42. Tests passing." | \
-    agentbus node reply abc123 --author code-agent
+    spacestation node reply abc123 --author code-agent
 ```
 
 ---
 
-### `agentbus node search`
+### `spacestation node search`
 
 Full-text search across all nodes.
 
 ```
-Usage: agentbus node search <query> [options]
+Usage: spacestation node search <query> [options]
 
 Options:
   --type <type>           Filter results by type
@@ -317,9 +317,9 @@ Options:
   --json                  Output as JSON
 
 Examples:
-  agentbus node search "auth bug"
-  agentbus node search "email" --type report -n 5
-  agentbus node search "rate limit" --json
+  spacestation node search "auth bug"
+  spacestation node search "email" --type report -n 5
+  spacestation node search "rate limit" --json
 ```
 
 **Output:**
@@ -333,19 +333,19 @@ Search: "auth bug" (3 results)
 
 ---
 
-### `agentbus node delete`
+### `spacestation node delete`
 
 Delete a node and all its descendants.
 
 ```
-Usage: agentbus node delete <path-or-id> [options]
+Usage: spacestation node delete <path-or-id> [options]
 
 Options:
   --force                 Skip confirmation prompt
   --json                  Output result as JSON
 
 Examples:
-  agentbus node delete engineering/space-station/old-report --force
+  spacestation node delete engineering/space-station/old-report --force
 ```
 
 ---
@@ -371,7 +371,7 @@ When `--content -` is passed (or content is omitted and stdin is piped), read co
 
 ```bash
 # Agent generates a report and pipes it
-generate_report | agentbus node create --type report \
+generate_report | spacestation node create --type report \
   --title "Daily Report" --content - --author email-agent --parent engineering
 ```
 
@@ -523,23 +523,23 @@ description: "How to interact with the AgentBus node system"
 # AgentBus CLI
 
 ## Reading nodes
-- `agentbus node list` — show root spaces
-- `agentbus node list engineering/space-station` — show children
-- `agentbus node list --type task --status open --assignee <your-name>` — your open tasks
-- `agentbus node tree engineering --depth 2` — visual tree
-- `agentbus node get <path-or-id>` — full details
-- `agentbus node search "query"` — search everything
+- `spacestation node list` — show root spaces
+- `spacestation node list engineering/space-station` — show children
+- `spacestation node list --type task --status open --assignee <your-name>` — your open tasks
+- `spacestation node tree engineering --depth 2` — visual tree
+- `spacestation node get <path-or-id>` — full details
+- `spacestation node search "query"` — search everything
 
 ## Creating content
-- `agentbus node create --type task --title "..." --content "..." --parent <path> --author <your-name>`
-- `agentbus node create --type report --title "..." --content - --parent <path> --author <your-name>`
+- `spacestation node create --type task --title "..." --content "..." --parent <path> --author <your-name>`
+- `spacestation node create --type report --title "..." --content - --parent <path> --author <your-name>`
   (pipe content via stdin for longer reports)
-- `agentbus node reply <path-or-id> --content "..." --author <your-name>`
+- `spacestation node reply <path-or-id> --content "..." --author <your-name>`
 
 ## Updating
-- `agentbus node update <path> --status done` — mark complete
-- `agentbus node update <path> --assignee <agent>` — reassign
-- `agentbus node update <path> --add-tag "reviewed"`
+- `spacestation node update <path> --status done` — mark complete
+- `spacestation node update <path> --assignee <agent>` — reassign
+- `spacestation node update <path> --add-tag "reviewed"`
 
 ## Tips
 - Use `--json` for machine-readable output when parsing results

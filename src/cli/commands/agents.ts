@@ -46,7 +46,7 @@ export function registerAgentCommands(program: Command): void {
       }
 
       if (agents.length === 0) {
-        console.log('No agents registered. Use "agentbus register" to add one.');
+        console.log('No agents registered. Use "spacestation register" to add one.');
         return;
       }
 
@@ -99,7 +99,7 @@ export function registerAgentCommands(program: Command): void {
           console.log(`Agent "${card.name}" registered (id: ${card.id})`);
           console.log(formatAgentCard(card));
           console.log('');
-          console.log('Note: CLI-registered agents cannot respond to "agentbus ask" commands.');
+          console.log('Note: CLI-registered agents cannot respond to "spacestation ask" commands.');
           console.log('Use the SDK to create agents that handle messages.');
         }
       } catch (err) {
@@ -191,6 +191,12 @@ export function registerAgentCommands(program: Command): void {
     .option('-t, --template <type>', 'Template: basic | full | cron', 'basic')
     .action(async (name: string, opts) => {
       try {
+        const validTemplates = ['basic', 'full', 'cron'];
+        if (!validTemplates.includes(opts.template)) {
+          console.error(`Invalid template "${opts.template}". Choose: ${validTemplates.join(', ')}`);
+          process.exitCode = 1;
+          return;
+        }
         const loader = new AgentLoader();
         const folderPath = await loader.initAgent(opts.dir, name, opts.template);
         const files = TEMPLATE_FILES[opts.template] ?? TEMPLATE_FILES.basic;

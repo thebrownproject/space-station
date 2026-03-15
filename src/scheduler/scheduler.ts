@@ -8,6 +8,22 @@ import type {
   CronJobConfig, CronJobStatus, DaemonState, ExecutionLog, SchedulerEvents,
 } from './scheduler-types.js';
 
+// Lazy-load run logging to avoid circular deps
+let _logRunStart: ((name: string, trigger: 'cron' | 'manual' | 'webhook', jobId?: string, prompt?: string) => string) | null = null;
+let _logRunComplete: ((id: string, status: 'running' | 'success' | 'error' | 'timeout', ms: number, code?: number, err?: string) => void) | null = null;
+
+async function ensureRunLog() {
+  if (!_logRunStart) {
+    try {
+      const { logRunStart, logRunComplete } = await import('../db/run-log.js');
+      _logRunStart = logRunStart;
+      _logRunComplete = logRunComplete;
+    } catch {
+      // DB not available, skip run logging
+    }
+  }
+}
+
 interface LoadedJob {
   agentName: string;
   agentDir: string;
@@ -99,6 +115,13 @@ export class CronManager extends EventEmitter<SchedulerEvents> {
 
     this.emit('job:start', log);
 
+    // Log run start to database
+    await ensureRunLog();
+    let runLogId: string | undefined;
+    try {
+      runLogId = _logRunStart?.(job.agentName, 'cron', job.config.id);
+    } catch { /* ignore logging errors */ }
+
     try {
       const action = job.config.action;
       let prompt: string;
@@ -155,6 +178,13 @@ export class CronManager extends EventEmitter<SchedulerEvents> {
     } finally {
       log.completedAt = new Date().toISOString();
       job.running = false;
+
+      // Log run completion to database
+      try {
+        if (runLogId && _logRunComplete) {
+          _logRunComplete(runLogId, log.status as any, log.durationMs ?? 0, undefined, log.error ?? undefined);
+        }
+      } catch { /* ignore logging errors */ }
 
       this.updateJobState(key, log);
       await this.saveState();

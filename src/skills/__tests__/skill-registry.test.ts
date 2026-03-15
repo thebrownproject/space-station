@@ -1,6 +1,6 @@
 import { SkillLoader } from '../skill-loader.js';
 import { SkillRegistry } from '../skill-registry.js';
-import type { Skill, SkillSource } from '../skill-types.js';
+import type { Skill } from '../skill-types.js';
 import { mkdtemp, writeFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';

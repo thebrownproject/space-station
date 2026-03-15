@@ -24,10 +24,10 @@ data/                    # SQLite database directory (gitignored)
 ## New Dependencies
 
 ```
-drizzle-orm (^0.36.0)        — SQL ORM, supports SQLite + Postgres
-better-sqlite3 (^11.0.0)    — SQLite driver for Node.js
+drizzle-orm (^0.45.0)        — SQL ORM, supports SQLite + Postgres
+better-sqlite3 (^12.0.0)    — SQLite driver for Node.js
 @types/better-sqlite3        — TypeScript types
-drizzle-kit (^0.30.0)       — Migration tooling (devDependency)
+drizzle-kit (^0.31.0)       — Migration tooling (devDependency)
 ```
 
 ---
@@ -153,7 +153,7 @@ export type NodePriority = 'low' | 'medium' | 'high' | 'critical';
 ```typescript
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { mkdirSync, existsSync } from 'node:fs';
 import * as schema from './schema.js';
 
@@ -182,7 +182,7 @@ export function getDb(): ReturnType<typeof drizzle> {
   sqlite.pragma('foreign_keys = ON');
   sqlite.pragma('busy_timeout = 5000');  // 5s retry on lock
 
-  db = drizzle(sqlite, { schema });
+  db = drizzle({ client: sqlite, schema });
   return db;
 }
 
@@ -586,7 +586,7 @@ export function searchNodes(query: string, limit: number = 20): Node[] {
  * Ensure slug is unique among siblings.
  * If "auth-bug" exists, try "auth-bug-2", "auth-bug-3", etc.
  */
-async function ensureUniqueSlug(parentId: string | null, baseSlug: string): Promise<string> {
+function ensureUniqueSlug(parentId: string | null, baseSlug: string): string {
   const db = getDb();
   let slug = baseSlug;
   let counter = 2;
@@ -640,16 +640,16 @@ export function seedDefaults(): void {
 ## Drizzle Config (`drizzle.config.ts`)
 
 ```typescript
-import type { Config } from 'drizzle-kit';
+import { defineConfig } from 'drizzle-kit';
 
-export default {
+export default defineConfig({
   schema: './src/db/schema.ts',
   out: './drizzle',                    // migration output directory
   dialect: 'sqlite',
   dbCredentials: {
     url: './data/agentbus.db',
   },
-} satisfies Config;
+});
 ```
 
 ---
@@ -829,4 +829,4 @@ For our use case (nodes rarely move, reads far outnumber writes), materialized p
 
 ### childCount Denormalization
 
-`childCount` is denormalized (incremented on insert, decremented on delete) to avoid `COUNT(*)` subqueries when listing nodes. This is critical for the CLI `agentbus node list` display where we show "3 children" next to each space.
+`childCount` is denormalized (incremented on insert, decremented on delete) to avoid `COUNT(*)` subqueries when listing nodes. This is critical for the CLI `spacestation node list` display where we show "3 children" next to each space.

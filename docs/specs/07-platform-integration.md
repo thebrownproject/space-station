@@ -21,12 +21,12 @@ How all modules connect. Changes to existing files, the end-to-end flow, example
     "ora": "^8.1.0",
     "cli-table3": "^0.6.5",
     "eventemitter3": "^5.0.1",
-    "drizzle-orm": "^0.36.0",
-    "better-sqlite3": "^11.0.0",
+    "drizzle-orm": "^0.45.0",
+    "better-sqlite3": "^12.0.0",
     "yaml": "^2.6.0",
     "gray-matter": "^4.0.3",
-    "croner": "^9.0.0",
-    "cronstrue": "^2.50.0"
+    "croner": "^10.0.0",
+    "cronstrue": "^3.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -36,7 +36,7 @@ How all modules connect. Changes to existing files, the end-to-end flow, example
     "jest": "^29.7.0",
     "@types/jest": "^29.5.0",
     "ts-jest": "^29.2.0",
-    "drizzle-kit": "^0.30.0"
+    "drizzle-kit": "^0.31.0"
   },
   "scripts": {
     "build": "tsc",
@@ -189,25 +189,25 @@ Read `SOUL.md` in this directory for your persona and values.
 
 ## How to Communicate
 
-Use the `agentbus` CLI to interact with the shared system:
+Use the `spacestation` CLI to interact with the shared system:
 
 ### Read
-- `agentbus node list` — see all top-level spaces
-- `agentbus node list engineering/space-station` — see items in a space
-- `agentbus node list --type task --status open --assignee email-agent` — your open tasks
-- `agentbus node get <path-or-id>` — read full details of a node
-- `agentbus node search "query"` — search across everything
+- `spacestation node list` — see all top-level spaces
+- `spacestation node list engineering/space-station` — see items in a space
+- `spacestation node list --type task --status open --assignee email-agent` — your open tasks
+- `spacestation node get <path-or-id>` — read full details of a node
+- `spacestation node search "query"` — search across everything
 
 ### Write
-- `agentbus node create --type report --title "Email Report YYYY-MM-DD" --content "..." --parent engineering/space-station --author email-agent`
-- `agentbus node create --type task --title "..." --content "..." --parent engineering/space-station --author email-agent --priority high --assignee reviewer-agent`
-- `agentbus node reply <path-or-id> --content "..." --author email-agent`
-- `agentbus node update <path-or-id> --status done`
+- `spacestation node create --type report --title "Email Report YYYY-MM-DD" --content "..." --parent engineering/space-station --author email-agent`
+- `spacestation node create --type task --title "..." --content "..." --parent engineering/space-station --author email-agent --priority high --assignee reviewer-agent`
+- `spacestation node reply <path-or-id> --content "..." --author email-agent`
+- `spacestation node update <path-or-id> --status done`
 
 ### Important
 - Always use `--author email-agent` when creating content
 - Use `--json` flag when you need to parse output programmatically
-- Pipe longer content via stdin: `echo "content" | agentbus node create --type report --content - ...`
+- Pipe longer content via stdin: `echo "content" | spacestation node create --type report --content - ...`
 
 ## Your Skills
 
@@ -258,27 +258,27 @@ version: 1.0.0
 # AgentBus CLI Reference
 
 ## Listing nodes
-agentbus node list [path]                   # children of a space (or root)
-agentbus node list --type task --status open # filter by type and status
-agentbus node list --assignee email-agent   # your assignments
-agentbus node tree [path] --depth 2         # visual tree
+spacestation node list [path]                   # children of a space (or root)
+spacestation node list --type task --status open # filter by type and status
+spacestation node list --assignee email-agent   # your assignments
+spacestation node tree [path] --depth 2         # visual tree
 
 ## Reading
-agentbus node get <path-or-id>              # full node details
-agentbus node search "query"                # full-text search
+spacestation node get <path-or-id>              # full node details
+spacestation node search "query"                # full-text search
 
 ## Creating
-agentbus node create --type <type> --title "..." --content "..." --parent <path> --author email-agent
+spacestation node create --type <type> --title "..." --content "..." --parent <path> --author email-agent
 # Types: space, post, task, page, comment, report
-# For long content, pipe via stdin: echo "..." | agentbus node create --content - ...
+# For long content, pipe via stdin: echo "..." | spacestation node create --content - ...
 
 ## Updating
-agentbus node update <path-or-id> --status done
-agentbus node update <path-or-id> --assignee <agent>
-agentbus node update <path-or-id> --add-tag "reviewed"
+spacestation node update <path-or-id> --status done
+spacestation node update <path-or-id> --assignee <agent>
+spacestation node update <path-or-id> --add-tag "reviewed"
 
 ## Replying
-agentbus node reply <path-or-id> --content "..." --author email-agent
+spacestation node reply <path-or-id> --content "..." --author email-agent
 ```
 
 ---
@@ -287,7 +287,7 @@ agentbus node reply <path-or-id> --content "..." --author email-agent
 
 ### Step 1: Daemon starts
 ```
-$ agentbus daemon start
+$ spacestation daemon start
 Daemon started. 3 jobs loaded from 2 agents.
   email-agent/nightly-check: Every day at 12:00 AM (next: 6h)
   email-agent/morning-report: Mon-Fri at 9:00 AM (next: 14h)
@@ -315,18 +315,18 @@ Claude Code starts in agents/email-agent/
   → Reads skills/agentbus-cli/SKILL.md: learns CLI commands
 
   → Checks assigned tasks:
-      $ agentbus node list --type task --status open --assignee email-agent --json
+      $ spacestation node list --type task --status open --assignee email-agent --json
       [{"id":"abc","title":"Follow up on client email","status":"open",...}]
 
   → Processes the task, marks done:
-      $ agentbus node update abc --status done
-      $ agentbus node reply abc --content "Followed up. Client confirmed receipt." --author email-agent
+      $ spacestation node update abc --status done
+      $ spacestation node reply abc --content "Followed up. Client confirmed receipt." --author email-agent
 
   → Checks email inbox (simulated or via API):
       Found 5 new emails, 1 urgent
 
   → Posts daily report:
-      $ agentbus node create --type report \
+      $ spacestation node create --type report \
           --title "Email Report 2026-03-15" \
           --content "Checked inbox at midnight. Found 5 new emails..." \
           --parent engineering/space-station \
@@ -334,7 +334,7 @@ Claude Code starts in agents/email-agent/
           --tags "email,daily-report"
 
   → Creates urgent task:
-      $ agentbus node create --type task \
+      $ spacestation node create --type task \
           --title "Urgent: Auth token expired in production" \
           --content "Received alert email from monitoring..." \
           --parent engineering/space-station \
@@ -398,8 +398,8 @@ User clicks into the critical task, reads details, adds a comment:
 - [ ] Create `src/agents/types.ts`
 - [ ] Create `src/agents/agent-loader.ts` (discover, loadManifest, initAgent)
 - [ ] Add `yaml` dependency
-- [ ] Add `agentbus init <name>` CLI command (in agents.ts)
-- [ ] Add `agentbus load <path>` CLI command (in agents.ts)
+- [ ] Add `spacestation init <name>` CLI command (in agents.ts)
+- [ ] Add `spacestation load <path>` CLI command (in agents.ts)
 - [ ] Write tests (`src/agents/__tests__/agent-loader.test.ts`)
 
 ### Skills
@@ -407,7 +407,7 @@ User clicks into the critical task, reads details, adds a comment:
 - [ ] Create `src/skills/skill-loader.ts` (parse SKILL.md with gray-matter)
 - [ ] Create `src/skills/skill-registry.ts`
 - [ ] Add `gray-matter` dependency
-- [ ] Add `agentbus skills list/info` CLI commands
+- [ ] Add `spacestation skills list/info` CLI commands
 - [ ] Write tests
 
 ### Example Agents
@@ -423,8 +423,8 @@ User clicks into the critical task, reads details, adds a comment:
 - [ ] Create `src/scheduler/scheduler.ts` (CronManager)
 - [ ] Create `src/scheduler/daemon.ts` (main daemon process)
 - [ ] Add `croner`, `cronstrue` deps
-- [ ] Add `agentbus daemon start/stop/status` CLI commands
-- [ ] Add `agentbus run <agent>` CLI command
+- [ ] Add `spacestation daemon start/stop/status` CLI commands
+- [ ] Add `spacestation run <agent>` CLI command
 - [ ] Catch-up logic for missed runs
 - [ ] Write tests
 

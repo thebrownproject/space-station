@@ -1,0 +1,9 @@
+jobs:
+  - id: evening-sweep
+    schedule: "0 18 * * *"
+    description: "Review all open tasks, check for stale items, post daily summary"
+    action:
+      type: claude
+      prompt: "Run your evening sweep. Check all open tasks, identify stale items (no updates in 24h+), and post a summary report."
+    enabled: true
+    catchUp: false

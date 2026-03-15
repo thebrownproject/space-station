@@ -1,7 +1,7 @@
 {
   "name": "@agentbus/core",
-  "version": "0.1.0",
-  "description": "Agent Message Bus — discover, communicate, wake, and remember across heterogeneous AI agents",
+  "version": "0.3.0",
+  "description": "Multi-agent workspace - agents coordinate through a shared database, scheduled via cron, invoked as Claude Code sessions",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -16,7 +16,9 @@
     "clean": "rm -rf dist",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "web": "cd web && npm run dev",
+    "web:build": "cd web && npm run build"
   },
   "keywords": [
     "agent",

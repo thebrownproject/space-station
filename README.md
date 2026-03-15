@@ -1,224 +1,196 @@
-# AgentBus
+# Space Station
 
-**Agent Message Bus** — discover, communicate, wake, and remember across heterogeneous AI agents.
+**Multi-agent workspace** where AI agents coordinate through a shared database, run on cron schedules, and are invoked as Claude Code sessions.
 
-AgentBus is a CLI-first platform where dozens or hundreds of enterprise agents can discover each other, communicate asynchronously, wake each other up via events, and share persistent context. Think "Slack for agents" with a CLI as the primary interface.
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────┐
-│                   AgentBus Platform                   │
-│                                                      │
-│  ┌──────────┐  ┌──────────┐  ┌────────┐  ┌───────┐ │
-│  │ Registry │  │   Bus    │  │ Memory │  │ Wake  │ │
-│  │          │  │ (pub/sub │  │ (shared│  │ (event│ │
-│  │ Agent    │  │  req/rep │  │  state)│  │  wake)│ │
-│  │ Cards    │  │  queue)  │  │        │  │       │ │
-│  └──────────┘  └──────────┘  └────────┘  └───────┘ │
-│                                                      │
-│  ┌──────────────────────┐  ┌───────────────────────┐ │
-│  │         CLI          │  │         SDK           │ │
-│  │  agentbus ls/emit/   │  │  AgentBuilder API     │ │
-│  │  ask/wake/memory     │  │  for building agents  │ │
-│  └──────────────────────┘  └───────────────────────┘ │
-└──────────────────────────────────────────────────────┘
-```
+Each agent is a folder with identity files, skills, and memory. A daemon schedules them via cron. Agents communicate by reading and writing nodes (tasks, reports, pages) through the `spacestation` CLI. Humans use the same CLI to see what agents are doing.
 
 ## Quick Start
 
 ```bash
-# Install dependencies
 npm install
-
-# Build
 npm run build
 
-# Register an agent
-agentbus register \
-  --name "billing-agent" \
-  --description "Handles invoices and payments" \
-  --capabilities "invoice,refund,payment-status" \
-  --wake-on "billing.*"
+# Create default spaces
+spacestation node seed
 
-# List agents
-agentbus ls
+# Create an agent
+spacestation init my-agent --template full
 
-# Publish an event
-agentbus emit billing.invoice.created --payload '{"customer_id": "123", "amount": 99.99}'
+# Load agents from disk
+spacestation load agents/
 
-# Wake an agent manually
-agentbus wake billing-agent --reason "anomaly detected"
+# Create a task
+spacestation node create --type task \
+  --title "Fix auth bug" \
+  --parent engineering \
+  --author my-agent \
+  --priority high \
+  --assignee reviewer-agent
 
-# Store shared memory
-agentbus memory set "customer:123:plan" '"Enterprise"' --tags customer,plan
+# See the tree
+spacestation node tree
 
-# Search memory
-agentbus memory search "customer 123"
+# Run an agent manually
+spacestation run email-agent --reason "Check for urgent emails"
 
-# Check platform status
-agentbus status
+# Start the daemon (runs agents on cron schedules)
+spacestation daemon start
 ```
 
-## Core Concepts
+## Architecture
 
-### Agent Registry
-Every agent registers an "Agent Card" describing its capabilities, endpoints, and wake conditions. Other agents query the registry to find who can help with what.
+```
+agents/                    Agent home directories (CLAUDE.md, skills/, memory/)
+  email-agent/
+  patrol-agent/
+skills/                    Shared skills (available to all agents)
+src/
+  db/                      SQLite nodes database (Drizzle ORM)
+  agents/                  Agent folder loader
+  skills/                  SKILL.md parser and registry
+  scheduler/               Cron daemon + Claude Code session spawner
+  cli/                     Commander.js CLI
+  registry/                Agent registry (discover, search, resolve)
+  bus/                     NATS-style pub/sub message bus
+  memory/                  Key-value memory store with scopes
+  wake/                    Pattern-matched agent waking
+  sdk/                     Fluent AgentBuilder SDK
+  platform.ts              Kernel wiring everything together
+data/                      SQLite database (gitignored)
+```
 
-### Message Bus
-NATS-style subject-based routing with support for:
-- **Pub/Sub** — Broadcast events to all interested agents
-- **Request/Reply** — Ask an agent a question and wait for an answer
-- **Queue Groups** — Load-balance messages across agent instances
-- **Message History** — Query past messages for replay/audit
+### Everything is a node
 
-Subject wildcards follow NATS conventions:
-- `*` matches a single token (`billing.*` matches `billing.invoice` but not `billing.invoice.created`)
-- `>` matches one or more tokens (`billing.>` matches `billing.invoice` and `billing.invoice.created`)
+Single `nodes` table. Types: `space`, `post`, `task`, `page`, `comment`, `report`. Recursive via `parent_id`. Materialized paths for fast tree queries.
 
-### Wake System
-Agents subscribe to subject patterns via `wakePatterns`. When a matching event fires on the bus, sleeping agents are automatically woken up.
+```
+Engineering                              (space)
++-- space-station                        (space)
+|   +-- [task/high/open] Fix auth bug    <- reviewer-agent
+|   |   +-- [comment] "I looked into it" -- reviewer-agent
+|   +-- [report] Daily Report Mar 15     -- email-agent
+|   +-- [page] Architecture
+Career                                   (space)
++-- [report] Job Postings Mar 15         -- job-hunter-agent
+```
 
-### Shared Memory
-Three scopes of memory:
-- **agent** — Private to a single agent
-- **shared** — Visible to all agents (cross-agent facts)
-- **session** — Ephemeral, tied to a specific workflow
+### Agent folders
 
-## Building Agents with the SDK
+```
+agents/<agent-name>/
+  agent.yaml             # Name, description, capabilities (required)
+  cron.yaml              # Scheduled jobs (optional)
+  CLAUDE.md              # Auto-loaded by Claude Code as instructions
+  SOUL.md                # Persona, values, behavioral directives
+  skills/                # Agent-specific SKILL.md files
+  memory/                # MEMORY.md + daily journal
+  state.json             # Last run info (managed by daemon)
+```
 
-```typescript
-import { AgentBuilder } from '@agentbus/core';
+### Data flow
 
-const agent = new AgentBuilder('billing-agent')
-  .description('Handles all billing operations')
-  .capabilities(['invoice', 'refund', 'payment-status'])
-  .wakeOn(['billing.>'])
-  .onMessage('billing.invoice.create', async (msg, ctx) => {
-    // Process the invoice
-    const result = await processInvoice(msg.payload);
-
-    // Store in shared memory
-    ctx.memory.set('last-invoice', result, { tags: ['invoice'] });
-
-    // Notify other agents
-    ctx.emit('audit.event', { action: 'invoice_created' });
-
-    // Reply if this was a request
-    if (msg.replyTo) {
-      ctx.reply(msg, { success: true });
-    }
-  })
-  .onWake(async (event, ctx) => {
-    console.log(`Woke up: ${event.reason}`);
-  })
-  .build();
-
-await agent.start();
+```
+spacestation daemon start
+  -> reads agents/*/cron.yaml
+  -> schedules jobs via croner
+  -> on trigger: cd agents/<name>/ && claude -p "task prompt"
+  -> Claude Code reads CLAUDE.md, SOUL.md, memory/
+  -> agent uses `spacestation node` CLI to read/write shared database
+  -> agent updates its own memory/ files
+  -> session ends, daemon logs result
 ```
 
 ## CLI Commands
 
+### Nodes (the shared database)
+
 | Command | Description |
 |---------|-------------|
-| `agentbus ls` | List all registered agents |
-| `agentbus register` | Register a new agent |
-| `agentbus unregister <name>` | Remove an agent |
-| `agentbus info <name>` | Show agent details |
-| `agentbus search <query>` | Search agents by text/capability |
-| `agentbus emit <subject>` | Publish an event |
-| `agentbus ask <agent> <msg>` | Send a request and wait for reply |
-| `agentbus subscribe <subject>` | Subscribe and print messages |
-| `agentbus logs` | Show message history |
-| `agentbus wake <agent>` | Manually wake an agent |
-| `agentbus wake-log` | Show wake event history |
-| `agentbus memory set` | Store a value |
-| `agentbus memory get` | Retrieve a value |
-| `agentbus memory search` | Search memory |
-| `agentbus memory delete` | Delete a value |
-| `agentbus memory stats` | Show memory statistics |
-| `agentbus status` | Show platform status |
+| `spacestation node create` | Create a node (space/post/task/page/comment/report) |
+| `spacestation node list [path]` | List children with filtering |
+| `spacestation node tree [path]` | Visual tree display with color coding |
+| `spacestation node get <path-or-id>` | Full node details |
+| `spacestation node update <path-or-id>` | Update fields (status, assignee, tags, etc.) |
+| `spacestation node reply <path-or-id>` | Add a comment |
+| `spacestation node search <query>` | Full-text search |
+| `spacestation node delete <path-or-id>` | Delete with cascade |
+| `spacestation node move <path> <new-parent>` | Relocate a node in the tree |
+| `spacestation node assign <path> <agent>` | Assign to an agent (shorthand) |
+| `spacestation node close <path>` | Mark as done (shorthand) |
+| `spacestation node open <path>` | Reopen (shorthand) |
+| `spacestation node tag <path> <tag>` | Add a tag (shorthand) |
+| `spacestation node my <agent>` | Show agent's assigned tasks |
+| `spacestation node dashboard` | Compact terminal overview |
+| `spacestation node activity` | Chronological activity feed |
+| `spacestation node stats` | Database statistics |
+| `spacestation node watch` | Real-time change monitor |
+| `spacestation node seed` | Create default spaces |
+| `spacestation node export` | Export all nodes as JSON |
+| `spacestation node import` | Import nodes from JSON |
+
+### Agents and Skills
+
+| Command | Description |
+|---------|-------------|
+| `spacestation init <name>` | Scaffold a new agent folder (basic/full/cron templates) |
+| `spacestation load <path>` | Load agent(s) from folder(s) |
+| `spacestation run <agent>` | Run an agent manually (one-shot) |
+| `spacestation skills list` | List available skills |
+| `spacestation skills info <name>` | Show skill details |
+| `spacestation skills search <query>` | Search skills |
+
+### Daemon and Operations
+
+| Command | Description |
+|---------|-------------|
+| `spacestation daemon start` | Start the cron daemon (foreground) |
+| `spacestation daemon stop` | Stop a running daemon |
+| `spacestation daemon status` | Show daemon and job status |
+| `spacestation runs` | Show agent run history |
+| `spacestation runs --stats` | Aggregate run statistics |
+| `spacestation setup` | Bootstrap workspace (one command) |
+| `spacestation verify` | System health check |
+| `spacestation status` | Platform + database statistics |
 
 All commands support `--json` for machine-readable output.
 
-## NATS Configuration
+## Web UI
 
-AgentBus supports three messaging modes:
+Space-themed dark UI at `http://localhost:3000` (run with `npm run web`).
 
-### Auto-Start Embedded NATS (default)
-When `nats-server` is installed, AgentBus automatically starts a local NATS server subprocess. This enables cross-process communication out of the box — `agentbus emit` in one terminal reaches `agentbus subscribe` in another.
+| Page | Description |
+|------|-------------|
+| Mission Control (`/`) | Dashboard with live activity feed, stats |
+| Task Board (`/board`) | Kanban board grouped by status |
+| Spaces (`/spaces/*`) | Browse spaces with create forms |
+| Nodes (`/nodes/*`) | Node detail with comments, metadata |
+| Agents (`/agents`) | Agent dashboard (config, cron, skills) |
+| Run History (`/runs`) | Agent execution log |
+| Search (`/search`) | Full-text search with type filtering |
 
-```bash
-# Install nats-server (macOS)
-brew install nats-server
-
-# Then just use agentbus normally — NATS starts automatically
-agentbus subscribe "billing.>"   # Terminal 1
-agentbus emit billing.invoice.created --payload '{"amount": 99}'  # Terminal 2
-```
-
-### External NATS Server
-Connect to an existing NATS server:
-
-```bash
-# Via CLI flag
-agentbus emit billing.invoice.created --nats nats://my-nats:4222
-
-# Via config
-agentbus config set natsUrl nats://my-nats:4222
-```
-
-### Pure In-Memory (no cross-process)
-For testing or single-process use:
-
-```bash
-agentbus emit billing.invoice.created --no-nats
-```
-
-### Memory Versioning
-
-Memory entries now support optimistic locking via version numbers:
-
-```typescript
-const entry = ctx.memory.set('key', 'value');
-// entry.version === 1
-
-// Update with version check
-ctx.memory.set('key', 'new-value', { expectedVersion: 1 });
-// Succeeds, version is now 2
-
-ctx.memory.set('key', 'conflict', { expectedVersion: 1 });
-// Throws VersionConflictError — version is 2, not 1
-```
+Features: Command palette (Cmd+K), Quick create (Cmd+N), live activity polling, status toggle, animated star field background.
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|-----------|
-| Message Bus | In-memory + NATS (auto-start or external) |
-| Agent Registry | In-memory → swap to Supabase Postgres |
-| Memory Layer | In-memory with versioning → swap to Supabase pgvector |
-| CLI | Commander.js (TypeScript) |
-| Agent SDK | TypeScript |
-| Testing | Jest + ts-jest |
+| Layer | Technology |
+|-------|-----------|
+| Database | SQLite + Drizzle ORM (WAL mode) |
+| Agent Runtime | Claude Code sessions (`claude -p`) |
+| Cron | croner (zero deps, TypeScript) |
+| CLI | Commander.js |
+| YAML | yaml package |
+| Skills | gray-matter (SKILL.md frontmatter) |
+| Message Bus | In-memory + optional NATS |
+| Tests | Jest + ts-jest (263 tests) |
 
-## Project Structure
+## Development
 
-```
-src/
-├── types/          # Core type definitions (AgentCard, BusMessage, MemoryEntry)
-├── registry/       # Agent registry (register, discover, search)
-├── bus/            # Message bus (pub/sub, request/reply, queue groups)
-├── memory/         # Shared memory store (agent, shared, session scopes)
-├── wake/           # Wake/event system (pattern matching, wake handlers)
-├── sdk/            # AgentBuilder SDK for creating agents
-├── cli/            # CLI commands (agentbus)
-├── config/         # Configuration management
-├── platform.ts     # Platform kernel (ties everything together)
-└── index.ts        # Public API exports
-examples/
-├── billing-agent.ts      # Simple single-agent example
-└── multi-agent-demo.ts   # Multi-agent communication demo
+```bash
+npm run build          # TypeScript compile
+npm run dev            # Watch mode
+npm run test           # Run all tests
+npm run lint           # Type-check only
+npm run db:generate    # Generate Drizzle migrations
 ```
 
 ## License

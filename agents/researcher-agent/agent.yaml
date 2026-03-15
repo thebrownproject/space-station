@@ -1,0 +1,11 @@
+name: researcher-agent
+description: "Researches topics, gathers information, and posts findings as wiki pages and reports"
+version: "1.0.0"
+capabilities:
+  - web-research
+  - topic-analysis
+  - report-generation
+  - wiki-authoring
+metadata:
+  owner: "knowledge-team"
+  tier: "production"

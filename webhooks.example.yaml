@@ -1,0 +1,24 @@
+# Space Station Webhook Configuration
+# Copy this file to webhooks.yaml and customize.
+#
+# Webhooks are fired when nodes are created, updated, or deleted.
+# Each webhook specifies which events it listens to and optional filters.
+
+webhooks:
+  # Notify Slack when high-priority tasks are created
+  # - url: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+  #   events: [node.created]
+  #   filter:
+  #     type: task
+  #     priority: [high, critical]
+
+  # Send all events to a local debug endpoint
+  # - url: http://localhost:9000/webhook
+  #   events: [node.created, node.updated, node.deleted]
+  #   secret: my-webhook-secret  # Optional HMAC-SHA256 signature
+
+  # Notify when any agent posts a report
+  # - url: https://your-server.com/agent-reports
+  #   events: [node.created]
+  #   filter:
+  #     type: report

@@ -198,6 +198,76 @@ export function updateNode(id: string, updates: UpdateNodeInput): Node {
   return parseNode(updated);
 }
 
+/**
+ * Move a node to a new parent. Updates path, depth, and childCounts
+ * for both old and new parents, and recursively updates descendant paths.
+ */
+export function moveNode(id: string, newParentId: string | null): Node {
+  const db = getDb();
+  const existing = db.select().from(nodes).where(eq(nodes.id, id)).get() as NodeRow | undefined;
+  if (!existing) throw new Error(`Node not found: ${id}`);
+
+  // Resolve new parent
+  let newParent: NodeRow | undefined;
+  if (newParentId) {
+    newParent = db.select().from(nodes).where(eq(nodes.id, newParentId)).get() as NodeRow | undefined;
+    if (!newParent) throw new Error(`New parent not found: ${newParentId}`);
+  }
+
+  const oldPath = existing.path;
+  const newSlug = ensureUniqueSlug(newParentId, existing.slug ?? existing.id.slice(0, 8));
+  const newPath = newParent?.path ? `${newParent.path}/${newSlug}` : newSlug;
+  const newDepth = newParent ? newParent.depth + 1 : 0;
+  const now = new Date().toISOString();
+
+  // Update the node itself
+  db.update(nodes).set({
+    parentId: newParentId,
+    path: newPath,
+    slug: newSlug,
+    depth: newDepth,
+    updatedAt: now,
+  }).where(eq(nodes.id, id)).run();
+
+  // Decrement old parent childCount
+  if (existing.parentId) {
+    const oldParent = db.select().from(nodes).where(eq(nodes.id, existing.parentId)).get() as NodeRow | undefined;
+    if (oldParent) {
+      db.update(nodes)
+        .set({ childCount: Math.max(0, oldParent.childCount - 1) })
+        .where(eq(nodes.id, existing.parentId))
+        .run();
+    }
+  }
+
+  // Increment new parent childCount
+  if (newParent) {
+    db.update(nodes)
+      .set({ childCount: newParent.childCount + 1 })
+      .where(eq(nodes.id, newParent.id))
+      .run();
+  }
+
+  // Update all descendant paths
+  if (oldPath) {
+    const descendants = db.select().from(nodes)
+      .where(like(nodes.path, `${oldPath}/%`))
+      .all() as NodeRow[];
+    for (const desc of descendants) {
+      if (!desc.path) continue;
+      const updatedPath = newPath + desc.path.slice(oldPath.length);
+      const depthDiff = newDepth - existing.depth;
+      db.update(nodes).set({
+        path: updatedPath,
+        depth: desc.depth + depthDiff,
+      }).where(eq(nodes.id, desc.id)).run();
+    }
+  }
+
+  const result = db.select().from(nodes).where(eq(nodes.id, id)).get() as NodeRow;
+  return parseNode(result);
+}
+
 export function deleteNode(id: string): boolean {
   const db = getDb();
   const existing = db.select().from(nodes).where(eq(nodes.id, id)).get() as NodeRow | undefined;
@@ -252,7 +322,8 @@ export function listNodes(filter?: NodeFilter): Node[] {
 
   // Default to root nodes when no scoping filters given
   if (!filter?.parentId && !filter?.path && !filter?.search && !filter?.type &&
-      !filter?.author && !filter?.assignee && !filter?.status && filter?.depth === undefined) {
+      !filter?.author && !filter?.assignee && !filter?.status && filter?.depth === undefined &&
+      !filter?.priority && (!filter?.tags || filter.tags.length === 0)) {
     conditions.push(isNull(nodes.parentId));
   }
 
@@ -262,6 +333,7 @@ export function listNodes(filter?: NodeFilter): Node[] {
   let orderCol: any = nodes.createdAt;
   if (filter?.orderBy === 'updated') orderCol = nodes.updatedAt;
   if (filter?.orderBy === 'title') orderCol = nodes.title;
+  if (filter?.orderBy === 'priority') orderCol = nodes.priority;
   const orderFn = filter?.orderDir === 'asc' ? asc : desc;
 
   let query = db.select().from(nodes);

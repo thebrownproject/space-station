@@ -49,7 +49,7 @@ export function registerBusCommands(program: Command): void {
 
       const target = platform.registry.resolve(agent);
       if (!target) {
-        console.error(`Agent "${agent}" not found. Use "agentbus ls" to see registered agents.`);
+        console.error(`Agent "${agent}" not found. Use "spacestation ls" to see registered agents.`);
         process.exitCode = 1;
         return;
       }

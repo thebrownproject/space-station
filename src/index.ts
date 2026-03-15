@@ -12,11 +12,13 @@ export { SkillLoader, SkillRegistry } from './skills/index.js';
 export type { Skill, SkillManifest, SkillFrontmatter, SkillSource, SkillResolutionOptions } from './skills/index.js';
 export {
   getDb, resolveDbPath, closeDb, runMigrations,
-  createNode, getNode, getNodeByPath, updateNode, deleteNode,
+  createNode, getNode, getNodeByPath, updateNode, moveNode, deleteNode,
   listNodes, searchNodes, getSubtree, getAncestors, getChildren,
   slugify, parseNode,
 } from './db/index.js';
 export type { Node, NodeRow, CreateNodeInput, UpdateNodeInput, NodeFilter, NodeType, NodeStatus, NodePriority } from './db/index.js';
+export { notifyWebhooks, reloadWebhooks } from './hooks/index.js';
+export type { WebhookConfig, WebhookPayload } from './hooks/index.js';
 export { runAgent, buildPrompt } from './scheduler/index.js';
 export type { CronAction, CronJobConfig, CronJobStatus, DaemonState, JobState, ExecutionLog, SchedulerEvents, RunOptions, RunResult } from './scheduler/index.js';
 export { AgentLoader } from './agents/index.js';

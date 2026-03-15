@@ -1,5 +1,5 @@
-import { readFile, readdir, stat, access, mkdir, writeFile } from 'node:fs/promises';
-import { join, basename, resolve } from 'node:path';
+import { readFile, readdir, access, mkdir, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { validateAgentName, validateSubject } from '../registry/index.js';
 import type {

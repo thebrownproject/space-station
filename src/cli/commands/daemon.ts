@@ -1,9 +1,11 @@
 import { Command } from 'commander';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { timeAgo } from '../formatters.js';
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import type { DaemonState } from '../../scheduler/scheduler-types.js';
+// CronJobStatus used when daemon is running (future: live status query)
 
 function resolveStateFile(opts: { state?: string }): string {
   return resolve(opts.state ?? './data/daemon-state.json');
@@ -114,7 +116,6 @@ export function registerDaemonCommands(program: Command): void {
           return;
         }
 
-        const enabled = jobEntries.filter(([, j]) => j.lastStatus !== undefined).length;
         console.log(`Jobs: ${jobEntries.length} loaded`);
         console.log('');
 
@@ -149,13 +150,4 @@ function formatStatus(status?: string): string {
   return status;
 }
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
+// timeAgo imported from formatters.ts

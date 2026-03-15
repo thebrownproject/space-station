@@ -2,7 +2,7 @@
 
 ## Summary
 
-A long-running Node.js process (`agentbus daemon`) that reads `cron.yaml` files from agent folders and spawns Claude Code sessions at scheduled times. Uses `croner` for scheduling. Manages concurrency, catch-up for missed runs, and execution logging.
+A long-running Node.js process (`spacestation daemon`) that reads `cron.yaml` files from agent folders and spawns Claude Code sessions at scheduled times. Uses `croner` for scheduling. Manages concurrency, catch-up for missed runs, and execution logging.
 
 ## Files to Create
 
@@ -17,15 +17,15 @@ src/scheduler/
     scheduler.test.ts
 
 src/cli/commands/
-  daemon.ts              # agentbus daemon start/stop/status
-  run.ts                 # agentbus run <agent> (manual trigger)
+  daemon.ts              # spacestation daemon start/stop/status
+  run.ts                 # spacestation run <agent> (manual trigger)
 ```
 
 ## New Dependencies
 
 ```
-croner (^9.0.0)          — Cron scheduling, zero deps
-cronstrue (^2.50.0)      — Human-readable cron descriptions
+croner (^10.0.0)         — Cron scheduling, zero deps
+cronstrue (^3.0.0)       — Human-readable cron descriptions
 ```
 
 ---
@@ -119,7 +119,8 @@ The runner is responsible for spawning Claude Code sessions for agent work.
 ```typescript
 import { spawn, type ChildProcess } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
+import { v4 as uuid } from 'uuid';
 import { resolveDbPath } from '../db/connection.js';
 
 export interface RunOptions {
@@ -177,7 +178,7 @@ export async function runAgent(options: RunOptions): Promise<RunResult> {
   const runId = uuid();
 
   // Build claude command
-  const args = ['-p', prompt, '--verbose'];
+  const args = ['-p', prompt, '--output-format', 'text'];
   if (model) args.push('--model', model);
 
   return new Promise<RunResult>((resolve) => {
@@ -271,10 +272,10 @@ export async function buildPrompt(
 
   // Remind agent about CLI
   parts.push('## Communication');
-  parts.push('- Use `agentbus node list` to see current state');
-  parts.push('- Use `agentbus node create` to post findings, reports, or tasks');
-  parts.push('- Use `agentbus node reply` to comment on existing items');
-  parts.push('- Use `agentbus node update` to change status or assignee');
+  parts.push('- Use `spacestation node list` to see current state');
+  parts.push('- Use `spacestation node create` to post findings, reports, or tasks');
+  parts.push('- Use `spacestation node reply` to comment on existing items');
+  parts.push('- Use `spacestation node update` to change status or assignee');
   parts.push('- Always use `--author ' + basename(agentDir) + '` when creating content');
 
   return parts.join('\n');
@@ -504,7 +505,7 @@ export class CronManager extends EventEmitter<SchedulerEvents> {
 
   /**
    * Run an agent manually (no cron job needed).
-   * Used by `agentbus run <agent>`.
+   * Used by `spacestation run <agent>`.
    */
   async runAgentManual(agentDir: string, reason: string): Promise<RunResult> {
     const prompt = await buildPrompt(agentDir, reason);
@@ -640,10 +641,10 @@ export async function startDaemon(options: {
 
 ## CLI Commands
 
-### `agentbus daemon`
+### `spacestation daemon`
 
 ```
-Usage: agentbus daemon <command>
+Usage: spacestation daemon <command>
 
 Commands:
   start           Start the daemon (foreground)
@@ -658,10 +659,10 @@ Options (start):
   --state <file>      State file (default: ./data/daemon-state.json)
 
 Examples:
-  agentbus daemon start                    # foreground
-  agentbus daemon start -d                 # background
-  agentbus daemon status
-  agentbus daemon stop
+  spacestation daemon start                    # foreground
+  spacestation daemon start -d                 # background
+  spacestation daemon status
+  spacestation daemon stop
 ```
 
 **Status output:**
@@ -676,12 +677,12 @@ Jobs: 4 loaded, 3 enabled, 1 disabled
   reviewer-agent   weekly-review      Every Monday at 10:00 AM  in 4d 16h       5d ago     disabled
 ```
 
-### `agentbus run`
+### `spacestation run`
 
 Manual one-shot agent execution (no cron needed).
 
 ```
-Usage: agentbus run <agent-name> [options]
+Usage: spacestation run <agent-name> [options]
 
 Options:
   --reason <text>       Why this run is happening (default: "Manual run")
@@ -691,9 +692,9 @@ Options:
   --dir <path>          Agents directory (default: ./agents)
 
 Examples:
-  agentbus run email-agent --reason "Check for urgent emails"
-  agentbus run reviewer-agent --skill code-review --reason "Review PR #42"
-  agentbus run job-hunter --reason "Search for new postings" --timeout 600
+  spacestation run email-agent --reason "Check for urgent emails"
+  spacestation run reviewer-agent --skill code-review --reason "Review PR #42"
+  spacestation run job-hunter --reason "Search for new postings" --timeout 600
 ```
 
 ---
@@ -741,13 +742,13 @@ jobs:
 
 ### Background Daemon
 
-For `agentbus daemon start -d` (detached mode), use Node.js `child_process.fork()` with `detached: true` and `stdio: 'ignore'`. Write PID to `data/daemon.pid`. The `stop` command reads the PID file and sends SIGTERM.
+For `spacestation daemon start -d` (detached mode), use Node.js `child_process.fork()` with `detached: true` and `stdio: 'ignore'`. Write PID to `data/daemon.pid`. The `stop` command reads the PID file and sends SIGTERM.
 
 ### Execution Logging
 
 Each agent run can optionally be logged as a node in the database:
 ```
-agentbus node create --type report \
+spacestation node create --type report \
   --title "Run: email-agent/nightly-check" \
   --parent agents/email-agent \
   --author daemon \

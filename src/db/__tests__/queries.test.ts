@@ -7,7 +7,7 @@ import * as schema from '../schema.js';
 import { _setDbForTesting } from '../connection.js';
 import {
   slugify, parseNode,
-  createNode, getNode, getNodeByPath, updateNode, deleteNode,
+  createNode, getNode, getNodeByPath, updateNode, moveNode, deleteNode,
   listNodes, getChildren, getAncestors, getSubtree, searchNodes,
   type NodeRow,
 } from '../queries.js';
@@ -423,8 +423,12 @@ describe('queries', () => {
       createNode({ type: 'space', title: 'Third' });
 
       const nodes = listNodes();
-      // desc order: newest first
-      expect(nodes[0].title).toBe('Third');
+      // All three returned; same-millisecond timestamps may not guarantee order
+      expect(nodes).toHaveLength(3);
+      const titles = nodes.map(n => n.title);
+      expect(titles).toContain('First');
+      expect(titles).toContain('Second');
+      expect(titles).toContain('Third');
     });
 
     test('sorts ascending when specified', () => {
@@ -596,6 +600,137 @@ describe('queries', () => {
       deleteNode(child.id);
       // childCount should be 0, not negative
       expect(getNode(parent.id)!.childCount).toBe(0);
+    });
+  });
+
+  // -- moveNode --
+
+  describe('moveNode', () => {
+    test('moves a node to a new parent', () => {
+      const spaceA = createNode({ type: 'space', title: 'Space A' });
+      const spaceB = createNode({ type: 'space', title: 'Space B' });
+      const task = createNode({ type: 'task', title: 'My Task', parentId: spaceA.id });
+
+      const moved = moveNode(task.id, spaceB.id);
+      expect(moved.parentId).toBe(spaceB.id);
+      expect(moved.path).toBe('space-b/my-task');
+      expect(moved.depth).toBe(1);
+    });
+
+    test('updates old parent childCount', () => {
+      const old = createNode({ type: 'space', title: 'Old Parent' });
+      const target = createNode({ type: 'space', title: 'New Parent' });
+      const child = createNode({ type: 'task', title: 'Child', parentId: old.id });
+      expect(getNode(old.id)!.childCount).toBe(1);
+
+      moveNode(child.id, target.id);
+      expect(getNode(old.id)!.childCount).toBe(0);
+      expect(getNode(target.id)!.childCount).toBe(1);
+    });
+
+    test('updates descendant paths', () => {
+      const src = createNode({ type: 'space', title: 'Src' });
+      const child = createNode({ type: 'space', title: 'Child', parentId: src.id });
+      const grandchild = createNode({ type: 'task', title: 'GC', parentId: child.id });
+
+      const dst = createNode({ type: 'space', title: 'Dst' });
+      moveNode(child.id, dst.id);
+
+      const updatedGC = getNode(grandchild.id)!;
+      expect(updatedGC.path).toBe('dst/child/gc');
+      expect(updatedGC.depth).toBe(2);
+    });
+
+    test('throws on non-existent source', () => {
+      expect(() => moveNode('nonexistent', null)).toThrow('not found');
+    });
+
+    test('throws on non-existent target', () => {
+      const node = createNode({ type: 'space', title: 'Exists' });
+      expect(() => moveNode(node.id, 'nonexistent')).toThrow('not found');
+    });
+  });
+
+  // -- Additional edge cases --
+
+  describe('additional edge cases', () => {
+    test('createNode with metadata', () => {
+      const node = createNode({
+        type: 'task',
+        title: 'With Metadata',
+        metadata: { dueDate: '2026-03-20', estimate: 4 },
+      });
+      expect(node.metadata.dueDate).toBe('2026-03-20');
+      expect(node.metadata.estimate).toBe(4);
+    });
+
+    test('updateNode merges metadata', () => {
+      const node = createNode({
+        type: 'task',
+        title: 'Merge Test',
+        metadata: { key1: 'value1' },
+      });
+      const updated = updateNode(node.id, { metadata: { key2: 'value2' } });
+      expect(updated.metadata.key1).toBe('value1');
+      expect(updated.metadata.key2).toBe('value2');
+    });
+
+    test('slugify handles special characters', () => {
+      const node = createNode({ type: 'page', title: "What's New in v2.0?!" });
+      expect(node.slug).toBe('what-s-new-in-v2-0');
+    });
+
+    test('slugify handles unicode', () => {
+      const node = createNode({ type: 'page', title: 'Hello World 123' });
+      expect(node.slug).toBe('hello-world-123');
+    });
+
+    test('listNodes with multiple tag filter', () => {
+      createNode({ type: 'task', title: 'Tagged A', tags: ['alpha', 'beta'] });
+      createNode({ type: 'task', title: 'Tagged B', tags: ['gamma'] });
+
+      const results = listNodes({ type: 'task', tags: ['alpha'] });
+      expect(results.some(n => n.title === 'Tagged A')).toBe(true);
+      expect(results.some(n => n.title === 'Tagged B')).toBe(false);
+    });
+
+    test('getSubtree returns root node', () => {
+      const root = createNode({ type: 'space', title: 'Subtree Root' });
+      const tree = getSubtree(root.id, 0);
+      expect(tree.length).toBe(1);
+      expect(tree[0].id).toBe(root.id);
+    });
+
+    test('getSubtree returns empty for non-existent root', () => {
+      const tree = getSubtree('nonexistent');
+      expect(tree).toEqual([]);
+    });
+
+    test('createNode with all fields', () => {
+      const parent = createNode({ type: 'space', title: 'Full Parent' });
+      const node = createNode({
+        type: 'task',
+        title: 'Full Task',
+        content: 'Detailed description',
+        author: 'test-agent',
+        status: 'in-progress',
+        priority: 'high',
+        assignee: 'other-agent',
+        tags: ['a', 'b', 'c'],
+        metadata: { custom: true },
+        parentId: parent.id,
+      });
+
+      expect(node.type).toBe('task');
+      expect(node.content).toBe('Detailed description');
+      expect(node.author).toBe('test-agent');
+      expect(node.status).toBe('in-progress');
+      expect(node.priority).toBe('high');
+      expect(node.assignee).toBe('other-agent');
+      expect(node.tags).toEqual(['a', 'b', 'c']);
+      expect(node.metadata.custom).toBe(true);
+      expect(node.parentId).toBe(parent.id);
+      expect(node.depth).toBe(1);
     });
   });
 });

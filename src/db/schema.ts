@@ -39,3 +39,30 @@ export const nodes = sqliteTable('nodes', {
 export type NodeType = 'space' | 'post' | 'task' | 'page' | 'comment' | 'report';
 export type NodeStatus = 'open' | 'in-progress' | 'review' | 'done' | 'closed';
 export type NodePriority = 'low' | 'medium' | 'high' | 'critical';
+
+/**
+ * Agent run log - tracks every daemon/manual agent execution.
+ * Used for observability, debugging, and cost tracking.
+ */
+export const agentRuns = sqliteTable('agent_runs', {
+  id: text('id').primaryKey(),
+  agentName: text('agent_name').notNull(),
+  jobId: text('job_id'),
+  trigger: text('trigger', { enum: ['cron', 'manual', 'webhook'] }).notNull(),
+  status: text('status', { enum: ['running', 'success', 'error', 'timeout'] }).notNull(),
+  prompt: text('prompt'),
+  exitCode: integer('exit_code'),
+  durationMs: integer('duration_ms'),
+  error: text('error'),
+  nodesCreated: integer('nodes_created').default(0),
+  nodesUpdated: integer('nodes_updated').default(0),
+  startedAt: text('started_at').notNull(),
+  completedAt: text('completed_at'),
+}, (table) => [
+  index('idx_run_agent').on(table.agentName),
+  index('idx_run_status').on(table.status),
+  index('idx_run_started').on(table.startedAt),
+]);
+
+export type RunStatus = 'running' | 'success' | 'error' | 'timeout';
+export type RunTrigger = 'cron' | 'manual' | 'webhook';

@@ -8,6 +8,9 @@ import { registerSkillsCommands } from './skills.js';
 import { registerNodeCommands } from './node.js';
 import { registerDaemonCommands } from './daemon.js';
 import { registerRunCommand } from './run.js';
+import { registerSetupCommand } from './setup.js';
+import { registerVerifyCommand } from './verify.js';
+import { registerRunsCommand } from './runs.js';
 
 export function registerCommands(program: Command): void {
   registerAgentCommands(program);
@@ -19,4 +22,7 @@ export function registerCommands(program: Command): void {
   registerNodeCommands(program);
   registerDaemonCommands(program);
   registerRunCommand(program);
+  registerSetupCommand(program);
+  registerVerifyCommand(program);
+  registerRunsCommand(program);
 }

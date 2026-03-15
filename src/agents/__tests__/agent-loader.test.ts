@@ -1,5 +1,5 @@
 import { AgentLoader } from '../agent-loader.js';
-import { mkdtemp, writeFile, mkdir, rm, readFile, access, readdir } from 'node:fs/promises';
+import { mkdtemp, writeFile, mkdir, rm, readFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { stringify } from 'yaml';

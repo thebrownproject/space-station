@@ -12,7 +12,6 @@ Load agents from filesystem directories. Each agent is a self-contained folder c
 src/agents/
   types.ts               # Type definitions
   agent-loader.ts        # Discover and load agent folders
-  agent-manager.ts       # Lifecycle management (load all, watch, init)
   index.ts               # Public exports
   __tests__/
     agent-loader.test.ts # Tests
@@ -103,8 +102,9 @@ export interface CronJobFileEntry {
   schedule: string;
   description?: string;
   action: {
-    type: 'wake' | 'emit' | 'skill';
-    reason?: string;         // for type: 'wake'
+    type: 'claude' | 'emit' | 'skill';
+    prompt?: string;         // for type: 'claude'
+    model?: string;          // for type: 'claude'
     subject?: string;        // for type: 'emit'
     payload?: unknown;       // for type: 'emit'
     skill?: string;          // for type: 'skill'
@@ -277,80 +277,6 @@ export class AgentLoader {
 
 ---
 
-## AgentManager (`src/agents/agent-manager.ts`)
-
-```typescript
-import type { AgentBusPlatform } from '../platform.js';
-import type { AgentManifest, AgentLoadResult } from './types.js';
-import { AgentLoader } from './agent-loader.js';
-
-/**
- * Higher-level manager that coordinates loading agent folders
- * into the platform (registry, scheduler, skills).
- */
-export class AgentManager {
-  private loader: AgentLoader;
-  private loaded: Map<string, AgentLoadResult> = new Map();  // name → result
-
-  constructor(private platform: AgentBusPlatform) {
-    this.loader = new AgentLoader();
-  }
-
-  /**
-   * Load a single agent from a folder into the platform.
-   * Registers with registry, loads cron jobs, discovers skills.
-   */
-  async loadAgent(folderPath: string): Promise<AgentLoadResult> {
-    // 1. loader.loadManifest(folderPath) → manifest
-    // 2. Register with platform.registry (convert manifest to AgentRegistration)
-    // 3. If manifest.cronConfig, load jobs into platform.scheduler
-    // 4. If manifest.skills, register with platform.skills
-    // 5. Track in this.loaded map
-    // 6. Return AgentLoadResult
-  }
-
-  /**
-   * Load all agents from a directory.
-   */
-  async loadDirectory(baseDir: string): Promise<AgentLoadResult[]> {
-    // 1. loader.discoverAgents(baseDir)
-    // 2. For each manifest, call loadAgent()
-    // 3. Collect results and warnings
-    // 4. Return all results
-  }
-
-  /**
-   * Unload an agent (unregister, remove cron jobs, remove skills).
-   */
-  async unloadAgent(name: string): Promise<boolean> {
-    // Reverse of loadAgent
-  }
-
-  /**
-   * Initialize a new agent folder.
-   */
-  async initAgent(baseDir: string, name: string, template?: string): Promise<string> {
-    return this.loader.initAgent(baseDir, name, template);
-  }
-
-  /**
-   * Get all loaded agent manifests.
-   */
-  getLoaded(): AgentLoadResult[] {
-    return Array.from(this.loaded.values());
-  }
-
-  /**
-   * Get a specific loaded agent's manifest.
-   */
-  getLoadResult(name: string): AgentLoadResult | undefined {
-    return this.loaded.get(name);
-  }
-}
-```
-
----
-
 ## agent.yaml Schema (Reference)
 
 ```yaml
@@ -407,8 +333,8 @@ jobs:
     schedule: "0 0 * * *"              # standard cron expression (5 or 6 fields)
     description: "Check inbox and post findings to wiki"
     action:
-      type: wake                        # wake | emit | skill
-      reason: "Nightly email check"     # only for type: wake
+      type: claude                      # claude | emit | skill
+      prompt: "Nightly email check"     # only for type: 'claude'
     enabled: true                       # default: true
     catchUp: true                       # run missed jobs on startup, default: false
     timezone: "America/New_York"        # optional, default: system timezone
@@ -437,7 +363,7 @@ jobs:
 
 ---
 
-## Template Files for `agentbus init`
+## Template Files for `spacestation init`
 
 ### basic template
 
@@ -466,7 +392,7 @@ Creates:
 
 ## CLI Commands
 
-### `agentbus init <name> [options]`
+### `spacestation init <name> [options]`
 
 Create a new agent folder.
 
@@ -476,8 +402,8 @@ Options:
   -t, --template <type>  Template: basic | full | cron (default: "basic")
 
 Example:
-  agentbus init email-agent --template full
-  agentbus init patrol-bot --dir ./my-agents --template cron
+  spacestation init email-agent --template full
+  spacestation init patrol-bot --dir ./my-agents --template cron
 ```
 
 Output:
@@ -491,7 +417,7 @@ Created agent folder: agents/email-agent/
   memory/       ✓
 ```
 
-### `agentbus load <path> [options]`
+### `spacestation load <path> [options]`
 
 Load agent(s) from folder(s) into the running platform.
 
@@ -500,8 +426,8 @@ Options:
   --json    Output as JSON
 
 Example:
-  agentbus load agents/email-agent     # Load single agent
-  agentbus load agents/                # Load all agents in directory
+  spacestation load agents/email-agent     # Load single agent
+  spacestation load agents/                # Load all agents in directory
 ```
 
 Output:
@@ -515,7 +441,7 @@ Warnings:
   reviewer-agent: SOUL.md is empty
 ```
 
-### Extended `agentbus info <name>`
+### Extended `spacestation info <name>`
 
 When an agent was loaded from a folder, show additional information:
 

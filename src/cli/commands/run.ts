@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { resolve, join } from 'node:path';
 import chalk from 'chalk';
+import { formatDuration } from '../formatters.js';
 
 export function registerRunCommand(program: Command): void {
   program.command('run')
@@ -14,6 +15,9 @@ export function registerRunCommand(program: Command): void {
     .action(async (agentName: string, opts) => {
       try {
         const { buildPrompt, runAgent } = await import('../../scheduler/index.js');
+        const { runMigrations } = await import('../../db/migrate.js');
+        const { logRunStart, logRunComplete } = await import('../../db/run-log.js');
+        runMigrations();
         const agentDir = resolve(join(opts.dir, agentName));
         const timeout = parseInt(opts.timeout, 10);
 
@@ -26,7 +30,7 @@ export function registerRunCommand(program: Command): void {
         console.log('');
 
         const prompt = await buildPrompt(agentDir, opts.reason, opts.skill);
-        const startTime = Date.now();
+        const runId = logRunStart(agentName, 'manual', undefined, opts.reason);
 
         const result = await runAgent({
           agentDir,
@@ -43,6 +47,10 @@ export function registerRunCommand(program: Command): void {
         console.log(`Duration:  ${formatDuration(result.durationMs)}`);
         if (result.timedOut) console.log(chalk.yellow('Timed out'));
 
+        // Log completion
+        const runStatus = result.timedOut ? 'timeout' : result.exitCode === 0 ? 'success' : 'error';
+        logRunComplete(runId, runStatus as any, result.durationMs, result.exitCode, result.timedOut ? 'Timed out' : undefined);
+
         process.exitCode = result.exitCode;
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : err}`);
@@ -51,11 +59,4 @@ export function registerRunCommand(program: Command): void {
     });
 }
 
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  const secs = Math.floor(ms / 1000);
-  if (secs < 60) return `${secs}s`;
-  const mins = Math.floor(secs / 60);
-  const remainSecs = secs % 60;
-  return `${mins}m ${remainSecs}s`;
-}
+// formatDuration imported from formatters.ts
