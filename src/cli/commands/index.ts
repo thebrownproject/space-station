@@ -5,6 +5,7 @@ import { registerMemoryCommands } from './memory.js';
 import { registerWakeCommands } from './wake.js';
 import { registerStatusCommand } from './status.js';
 import { registerSkillsCommands } from './skills.js';
+import { registerNodeCommands } from './node.js';
 
 export function registerCommands(program: Command): void {
   registerAgentCommands(program);
@@ -13,4 +14,5 @@ export function registerCommands(program: Command): void {
   registerWakeCommands(program);
   registerStatusCommand(program);
   registerSkillsCommands(program);
+  registerNodeCommands(program);
 }
