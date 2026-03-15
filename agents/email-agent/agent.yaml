@@ -1,0 +1,11 @@
+name: email-agent
+description: "Monitors email, processes messages, posts findings to the shared wiki"
+version: "1.0.0"
+capabilities:
+  - email-monitoring
+  - report-generation
+  - wiki-posting
+wakePatterns:
+  - "wiki.issue.assigned.email-agent"
+metadata:
+  owner: "team-comms"

@@ -1,0 +1,18 @@
+jobs:
+  - id: nightly-check
+    schedule: "0 0 * * *"
+    description: "Check inbox and post findings"
+    action:
+      type: claude
+      prompt: "Run your nightly email check. Check for unread messages, classify priority, and post a report to engineering/space-station."
+    enabled: true
+    catchUp: true
+    timezone: "Australia/Sydney"
+
+  - id: morning-report
+    schedule: "0 9 * * 1-5"
+    description: "Generate daily summary"
+    action:
+      type: skill
+      skill: summarize
+    enabled: true
