@@ -6,7 +6,7 @@ import { registerCommands } from './commands/index.js';
 const program = new Command();
 
 program
-  .name('agentbus')
+  .name('spacestation')
   .description('Agent Message Bus — discover, communicate, wake, and remember across AI agents')
   .version('0.1.0');
 

@@ -17,6 +17,12 @@ export interface AgentBusConfig {
   requestTimeout: number;
   /** Memory cleanup interval in ms */
   memoryCleanupInterval: number;
+  /** Path to SQLite database file */
+  dbPath?: string;
+  /** Path to agents directory */
+  agentsDir?: string;
+  /** Automatically discover and load agents on startup */
+  autoLoadAgents?: boolean;
 }
 
 const DEFAULT_CONFIG: AgentBusConfig = {
@@ -26,6 +32,8 @@ const DEFAULT_CONFIG: AgentBusConfig = {
   maxWakeLog: 1_000,
   requestTimeout: 30_000,
   memoryCleanupInterval: 60_000,
+  agentsDir: './agents',
+  autoLoadAgents: true,
 };
 
 export function loadConfig(overrides: Partial<AgentBusConfig> = {}): AgentBusConfig {

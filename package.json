@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "agentbus": "dist/cli/index.js"
+    "spacestation": "dist/cli/index.js"
   },
   "scripts": {
     "build": "tsc",

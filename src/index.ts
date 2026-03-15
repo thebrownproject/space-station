@@ -10,6 +10,15 @@ export { WakeManager } from './wake/index.js';
 export type { WakeEvent, WakeHandler } from './wake/index.js';
 export { SkillLoader, SkillRegistry } from './skills/index.js';
 export type { Skill, SkillManifest, SkillFrontmatter, SkillSource, SkillResolutionOptions } from './skills/index.js';
+export {
+  getDb, resolveDbPath, closeDb, runMigrations,
+  createNode, getNode, getNodeByPath, updateNode, deleteNode,
+  listNodes, searchNodes, getSubtree, getAncestors, getChildren,
+  slugify, parseNode,
+} from './db/index.js';
+export type { Node, NodeRow, CreateNodeInput, UpdateNodeInput, NodeFilter, NodeType, NodeStatus, NodePriority } from './db/index.js';
+export { AgentLoader } from './agents/index.js';
+export type { AgentManifest, AgentFolderConfig, AgentIdentityFiles, AgentSkillRef, CronFileConfig, CronJobFileEntry, AgentLoadResult } from './agents/index.js';
 
 // SDK
 export { AgentBuilder, Agent } from './sdk/index.js';
